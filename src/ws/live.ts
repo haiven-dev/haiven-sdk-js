@@ -24,12 +24,11 @@ import type { ClientFrame, RawServerFrame, SocketLike } from "./protocol.ts"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-/** `the sibling server checkout`, two repositories up from `sdk-source/ts/src/ws`. */
-// The sibling checkout is `the server checkout`; it was `backend` before the rename.
-// Getting this wrong does not fail — `liveUnavailable` reports "backend checkout
-// not found" and every live and conformance scenario skips, which is how four
-// stale expectations survived here for as long as they did.
-export const backendDir = process.env.HAIVEN_BACKEND ?? path.resolve(here, "../../../../server-checkout")
+/** Sibling `the server checkout`, one repository up from this checkout's `src/ws`. */
+// The directory was `backend` before the rename. One extra `..` walks out of
+// the parent that holds the sibling checkouts, so a missing backend is reported
+// at the wrong place and every live and conformance scenario skips.
+export const backendDir = process.env.HAIVEN_BACKEND ?? path.resolve(here, "../../../server-checkout")
 
 /**
  * Why the live tests may not run here.

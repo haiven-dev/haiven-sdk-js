@@ -146,9 +146,9 @@ export function summarize(doc) {
 	}
 }
 
-// Relative to this file: ts/scripts -> ts -> sdk-source -> src, where the
-// sibling `backend` checkout lives in the Haiven development workspace.
-const DEFAULT_SOURCE = "../../../backend/cmd/server/docs/docs.go"
+// Relative to this file: scripts -> this repo -> the parent that holds the
+// sibling `the server checkout` checkout.
+export const DEFAULT_SOURCE = "../../server-checkout/cmd/server/docs/docs.go"
 
 if (import.meta.filename === process.argv[1]) {
 	const [, , sourceArg, outArg] = process.argv
@@ -160,7 +160,7 @@ if (import.meta.filename === process.argv[1]) {
 	} catch (err) {
 		if (err.code === "ENOENT") {
 			console.error(`no swag-generated Go at ${source}`)
-			console.error("pass a path explicitly, or check out ../backend beside this repo")
+			console.error("pass a path explicitly, or check out ../server-checkout beside this repo")
 			process.exit(2)
 		}
 		throw err
