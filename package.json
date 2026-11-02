@@ -1,0 +1,17 @@
+{
+	"name": "@haiven/sdk-spike-ts",
+	"private": true,
+	"type": "module",
+	"description": "TypeScript spike — what does binding the Haiven API from TS actually cost?",
+	"engines": {
+		"node": ">=22.18"
+	},
+	"scripts": {
+		"test": "node --test \"test/**/*.test.ts\"",
+		"typecheck": "tsc --noEmit",
+		"extract": "node scripts/extract-swagger.mjs"
+	},
+	"devDependencies": {
+		"typescript": "5.9.3"
+	}
+}

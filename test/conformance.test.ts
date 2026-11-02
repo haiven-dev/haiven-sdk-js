@@ -1,0 +1,227 @@
+// Runner #1 of the conformance suite: node, executing the declarative corpus
+// against the live fixture.
+//
+// The point is not that these behaviours are untested — live.test.ts proves all
+// of them already, in prose. The point is that the *same file* has to be
+// executable by a dotnet runner, a Godot headless runner and an Unreal
+// automation runner, and the only way to find out whether the step vocabulary is
+// expressible in four languages is to write one interpreter and see what it
+// needed. Anything this runner had to special-case is a scenario the other three
+// will not be able to run.
+
+import { strict as assert } from "node:assert"
+import { readFileSync } from "node:fs"
+import { after, before, describe, it } from "node:test"
+
+import { LiveFixture, liveUnavailable, type LiveClient } from "../src/ws/live.ts"
+import type { RawServerFrame } from "../src/ws/protocol.ts"
+
+// The suite is published by haiven-contracts and vendored through the pinned
+// submodule. It used to be a local fork at conformance/corpus.json; that fork
+// drifted to assert a handshake the server stopped sending, and nobody saw it
+// because this runner was skipping on a stale backend path.
+const SUITE = new URL(
+	"../../haiven-contracts/conformance/sdk/gaming/v0/generated/suite.json",
+	import.meta.url,
+).pathname
+
+/**
+ * What a scenario needs of its token, never how to obtain one.
+ *
+ * `ttl` used to sit here, and it was the corpus's one leak of a fixture
+ * affordance into a protocol action: only the fixture can mint a token to
+ * order, so a runner driving a real deployment had to waive every authenticated
+ * scenario — which is most of them. A kind is a property the server will observe,
+ * so a deployment source can sign in for `valid` and waive only what it cannot
+ * produce.
+ */
+type TokenKind = "valid" | "expired"
+
+/**
+ * How one runner resolves a token kind.
+ *
+ * `supplies` is declared rather than inferred so a runner that cannot produce a
+ * kind fails as a recorded waiver rather than as an unexplained protocol error
+ * halfway through a scenario.
+ */
+type TokenSource = {
+	readonly supplies: readonly TokenKind[]
+	supply(kind: TokenKind): Promise<string>
+}
+
+type Step = {
+	do: string
+	token?: TokenKind
+	requestId?: string
+	ms?: number
+	type?: string
+	keys?: string[]
+	fields?: Record<string, unknown>
+	frame?: { type: string; requestId?: string; payload?: unknown }
+}
+
+type Scenario = {
+	id: string
+	title: string
+	why: string
+	steps: Step[]
+	waivers: Record<string, string>
+}
+
+const corpus = JSON.parse(readFileSync(SUITE, "utf8")) as {
+	corpus_version: number
+	scenarios: Scenario[]
+}
+
+const unavailable = await liveUnavailable()
+
+describe("the conformance corpus, run by node", { skip: unavailable, timeout: 120_000 }, () => {
+	let fx: LiveFixture
+
+	/**
+	 * The fixture token source: it mints, so it supplies both kinds.
+	 *
+	 * A deployment source is the one that cannot. It signs in and receives a
+	 * usable token, so it supplies `valid` and nothing else — and waiving on that
+	 * costs it one scenario instead of all of them, which is the measurement the
+	 * kind split was made for.
+	 */
+	const tokens: TokenSource = {
+		supplies: ["valid", "expired"],
+		// A negative ttl sits inside the verifier's 30s leeway, so the token
+		// verifies while the session it mints is already lapsed. That is how the
+		// expired paths are reached without waiting out a real expiry.
+		supply: (kind) => fx.token(kind === "expired" ? "-1s" : "1h"),
+	}
+
+	before(async () => {
+		fx = await LiveFixture.start()
+	})
+
+	after(async () => {
+		await fx?.stop()
+	})
+
+	// A waiver is a recorded gap, not a skip: it names the runner that cannot
+	// execute the scenario and why. `deployment` is waived here because the step
+	// needs the fixture's push affordance, which a real backend does not expose.
+	const runnable = corpus.scenarios.filter((s) => !("node" in s.waivers))
+
+	it("has scenarios to run", () => {
+		assert.ok(runnable.length > 0)
+		assert.equal(corpus.corpus_version, 1)
+	})
+
+	it("needs no token kind this runner's source cannot supply", () => {
+		// The guard that keeps a waiver honest. Without it, a scenario asking for
+		// a kind this source does not have would fail deep inside the transcript
+		// as a protocol error, which reads as a server bug rather than as a
+		// runner that should have waived.
+		const needed = new Set(
+			runnable.flatMap((s) => s.steps.filter((step) => step.do === "auth").map((step) => step.token ?? "valid")),
+		)
+
+		const missing = [...needed].filter((kind) => !tokens.supplies.includes(kind))
+
+		assert.deepEqual(missing, [], "a scenario needs a token kind this runner cannot produce; waive it")
+	})
+
+	it("costs a deployment runner one scenario, not all of them", () => {
+		// The measurement the kind split was made for, pinned so a regression to
+		// a ttl-shaped `auth` is visible here rather than in an argument.
+		const deployment: readonly TokenKind[] = ["valid"]
+
+		const blocked = corpus.scenarios.filter((s) =>
+			s.steps.some((step) => step.do === "auth" && !deployment.includes(step.token ?? "valid")),
+		)
+
+		assert.deepEqual(
+			blocked.map((s) => s.id),
+			["handshake-into-a-lapsed-session-says-so"],
+		)
+
+		for (const scenario of blocked) {
+			assert.ok(
+				"deployment" in scenario.waivers,
+				`${scenario.id}: needs a kind a deployment source lacks and does not waive deployment`,
+			)
+		}
+	})
+
+	for (const scenario of runnable) {
+		it(`${scenario.id}: ${scenario.title}`, async () => {
+			let client: LiveClient | null = null
+
+			for (const step of scenario.steps) {
+				switch (step.do) {
+					case "connect":
+						client = await fx.client()
+						break
+
+					case "auth": {
+						assert.ok(client, `${scenario.id}: auth before connect`)
+						client.send({
+							type: "auth",
+							requestId: step.requestId ?? "",
+							payload: await tokens.supply(step.token ?? "valid"),
+						})
+						break
+					}
+
+					case "send":
+						assert.ok(client && step.frame, `${scenario.id}: send needs a frame`)
+						client.send({
+							type: step.frame.type,
+							requestId: step.frame.requestId ?? "",
+							...(step.frame.payload === undefined ? {} : { payload: step.frame.payload }),
+						})
+						break
+
+					case "push":
+						assert.ok(step.frame, `${scenario.id}: push needs a frame`)
+						await fx.push({ type: step.frame.type, payload: step.frame.payload })
+						break
+
+					case "expect": {
+						assert.ok(client, `${scenario.id}: expect before connect`)
+						const frame: RawServerFrame = await client.next()
+						assert.equal(frame.type, step.type, `${scenario.id}: wrong frame type`)
+
+						if (step.keys) {
+							assert.deepEqual(
+								Object.keys(frame).sort(),
+								[...step.keys].sort(),
+								`${scenario.id}: unexpected key set`,
+							)
+						}
+
+						for (const [field, expected] of Object.entries(step.fields ?? {})) {
+							assert.deepEqual(
+								(frame as Record<string, unknown>)[field],
+								expected,
+								`${scenario.id}: ${field}`,
+							)
+						}
+						break
+					}
+
+					case "expectSilence": {
+						assert.ok(client, `${scenario.id}: expectSilence before connect`)
+						const arrived: RawServerFrame[] = await client.quiesce(step.ms ?? 500)
+						assert.deepEqual(
+							arrived.map((f: RawServerFrame) => f.type),
+							[],
+							`${scenario.id}: expected silence`,
+						)
+						break
+					}
+
+					default:
+						assert.fail(`${scenario.id}: unknown step "${step.do}"`)
+				}
+			}
+
+			client?.close()
+		})
+	}
+})
