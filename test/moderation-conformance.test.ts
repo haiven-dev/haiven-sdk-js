@@ -28,7 +28,7 @@ import {
 } from "../src/rest/moderation-fixture.ts"
 
 const SUITE = new URL(
-	"../../contract-schemas/conformance/sdk/moderation/v0/generated/suite.json",
+	"../../sdk-source/contract-schemas/conformance/sdk/moderation/v0/generated/suite.json",
 	import.meta.url,
 ).pathname
 

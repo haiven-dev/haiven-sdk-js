@@ -21,7 +21,7 @@ import type { RawServerFrame } from "../src/ws/protocol.ts"
 // drifted to assert a handshake the server stopped sending, and nobody saw it
 // because this runner was skipping on a stale backend path.
 const SUITE = new URL(
-	"../../contract-schemas/conformance/sdk/gaming/v0/generated/suite.json",
+	"../../sdk-source/contract-schemas/conformance/sdk/gaming/v0/generated/suite.json",
 	import.meta.url,
 ).pathname
 
