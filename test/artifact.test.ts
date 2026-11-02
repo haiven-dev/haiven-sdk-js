@@ -23,7 +23,7 @@ const FIXTURE = new URL("../fixtures/docs-excerpt.go.txt", import.meta.url).path
 // The sibling checkout in the Haiven development workspace. Absent in this
 // repository's CI, which is why the fixture exists.
 const BACKEND_DOCS = new URL(
-	"../../../backend/cmd/server/docs/docs.go",
+	"../../haiven-backend/cmd/server/docs/docs.go",
 	import.meta.url,
 ).pathname
 
@@ -100,7 +100,7 @@ describe("what swag emits for a named string type, before correction", () => {
 // docs/findings.md come from here.
 const hasBackend = existsSync(BACKEND_DOCS)
 
-describe("the real backend surface", { skip: hasBackend ? false : "no ../backend checkout" }, () => {
+describe("the real backend surface", { skip: hasBackend ? false : "no ../haiven-backend checkout" }, () => {
 	it("is recoverable in full", () => {
 		const doc = extractFromFile(BACKEND_DOCS)
 		const s = summarize(doc)

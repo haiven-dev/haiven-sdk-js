@@ -114,7 +114,7 @@ node scripts/extract-swagger.mjs                        # summarise
 node scripts/extract-swagger.mjs '' /tmp/haiven.json    # and write it out
 ```
 
-Defaults to `../../../backend/cmd/server/docs/docs.go`; pass a path as the first
+Defaults to `../../haiven-backend/cmd/server/docs/docs.go`; pass a path as the first
 argument to point it elsewhere. This exists to **measure** the missing artifact,
 not to become the supported way to get one — the supported fix is one flag on
 the backend's `swag` task, which `docs/findings.md` spells out.
