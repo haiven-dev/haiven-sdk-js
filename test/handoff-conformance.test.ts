@@ -14,7 +14,7 @@ import {
 import { OpenCodec } from "../src/wire/code.ts"
 
 const SUITE = new URL(
-	"../../haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json",
+	"../../haiven-sdk/haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json",
 	import.meta.url,
 ).pathname
 
