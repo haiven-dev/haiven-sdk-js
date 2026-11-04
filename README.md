@@ -1,11 +1,21 @@
-# TypeScript spike
+# JavaScript SDK spike
+
+The GitHub repository is still named `haiven-sdk-ts`. The intended name is
+`haiven-sdk-js`. That rename has not been applied: the account used here is not
+an organization admin, and `https://github.com/haiven-dev/haiven-sdk-js` does
+not exist. Until an owner of the `haiven-dev` organization renames it, the live
+URL remains `https://github.com/haiven-dev/haiven-sdk-ts`.
+
+Sources under `src/` and `test/` are JavaScript. Each module has a sibling
+`.d.ts` declaration file. Node runs the `.js` files directly.
 
 ## The question
 
-**What does binding the Haiven API from TypeScript actually cost, and which of
-those costs are the API's rather than TypeScript's?**
+**What does binding the Haiven API from JavaScript, with TypeScript
+declarations, actually cost, and which of those costs are the API's rather
+than the language's?**
 
-TypeScript goes first because it needs no engine toolchain. That isolates the
+JavaScript goes first because it needs no engine toolchain. That isolates the
 API surface from the target runtime: anything awkward here is awkward because of
 the API, not because of Unity's IL2CPP stripping or Unreal's module system. It
 is also the least hypothetical target — `packages/app`, `apps/desktop` and
@@ -19,7 +29,7 @@ Three sub-questions, from `docs/findings.md`:
 2. **(Q6) Do the two published vocabularies survive codegen?** `wire/errorcode`
    and `wire/messagetype` are deliberately *open* string types so a client on an
    older contract can receive and forward a value minted after it shipped. Does
-   that intent reach a TypeScript consumer?
+   that intent reach a consumer of the `.d.ts` files?
 3. **(Q2, Q3) Does the in-band auth handshake bind cleanly**, and can
    `auth.expired` be answered on the live socket, or does a binding end up
    reconnecting when the server never asked it to?
@@ -123,7 +133,6 @@ the backend's `swag` task, which `docs/findings.md` spells out.
 ## Layout
 
 ```text
-ts/
 ├── scripts/extract-swagger.mjs   Q5 — recover a description from swag's Go
 ├── src/handoff/                  PKCE coordinator + browser/Node/RN profiles
 ├── src/rest/client.js            hand-written host/session/error transport

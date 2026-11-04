@@ -1,5 +1,5 @@
 {
-	"name": "@haiven/sdk-spike-ts",
+	"name": "@haiven/sdk-spike-js",
 	"private": true,
 	"type": "module",
 	"description": "Haiven API binding spike — JavaScript sources with TypeScript declarations.",
