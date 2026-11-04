@@ -1,10 +1,7 @@
 # JavaScript SDK spike
 
-The GitHub repository is still named `haiven-sdk-ts`. The intended name is
-`haiven-sdk-js`. That rename has not been applied: the account used here is not
-an organization admin, and `https://github.com/haiven-dev/haiven-sdk-js` does
-not exist. Until an owner of the `haiven-dev` organization renames it, the live
-URL remains `https://github.com/haiven-dev/haiven-sdk-ts`.
+The GitHub repository is [`haiven-sdk-js`](https://github.com/haiven-dev/haiven-sdk-js).
+The previous name `haiven-sdk-ts` redirects to that repository.
 
 Sources under `src/` and `test/` are JavaScript. Each module has a sibling
 `.d.ts` declaration file. Node runs the `.js` files directly.
