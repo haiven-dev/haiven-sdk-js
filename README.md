@@ -31,11 +31,11 @@ from here is produced by something in `test/` that can be re-run, and the
 findings are meant to be changed by rerunning it rather than by editing the
 conclusion.
 
-The socket half runs **both ways**. `test/live.test.ts` drives the scenarios
+The socket half runs **both ways**. `test/live.test.js` drives the scenarios
 against a real server — `backend/cmd/wsfixture`, which is the real websocket
 stack with only the identity provider, one user row and the pub/sub broker
-stubbed — and `test/auth.test.ts` drives the same scenarios against a model of
-it (`src/ws/fake-server.ts`) so they stay reachable without a Go toolchain.
+stubbed — and `test/auth.test.js` drives the same scenarios against a model of
+it (`src/ws/fake-server.js`) so they stay reachable without a Go toolchain.
 
 The model is not an independent source of truth. Where the two disagree the
 server is right and the model is a bug, and it was a bug: F9 records what a live
@@ -54,31 +54,32 @@ reproduction harness for the historical missing-artifact finding.
 
 ## Running it
 
-Node 22.18+ (24+ recommended). Types are stripped natively, so there is no build
-step and no runtime dependency.
+Node 22.18+ (24+ recommended). The modules are JavaScript, and each one has a
+sibling `.d.ts`. Node runs the `.js` files directly, so there is no build step
+and no runtime dependency. `npm run typecheck` checks the declarations.
 
 ```sh
-node --test "test/**/*.test.ts"
+node --test "test/**/*.test.js"
 ```
 
-Several tests measure the real backend and skip themselves when `../../backend`
-is absent, so the suite is green in a standalone clone but only *complete* inside
-the Haiven development workspace. The skip is reported rather than silent. The
-live socket suite additionally needs a Go toolchain — it builds and runs the
-fixture — and takes about 20s.
+Several tests measure the real backend and skip themselves when the sibling
+`haiven-backend` checkout is absent, so the suite is green in a standalone clone
+but only *complete* beside that checkout. The skip is reported rather than
+silent. The live socket suite additionally needs a Go toolchain — it builds and
+runs the fixture — and takes about 20s.
 
 To run it against a different checkout, for example a worktree at another
 revision:
 
 ```sh
-HAIVEN_BACKEND=/path/to/backend node --test "test/**/*.test.ts"
+HAIVEN_BACKEND=/path/to/haiven-backend node --test "test/**/*.test.js"
 ```
 
-Type checking needs the one dev dependency:
+Type checking uses the dev dependencies (`typescript` and `@types/node`):
 
 ```sh
-npm install --no-save typescript@5.9.3 @types/node
-npx tsc --noEmit
+npm install
+npm run typecheck
 ```
 
 `make check` from the repository root runs both.
@@ -90,7 +91,7 @@ npx tsc --noEmit
 token and its absolute expiry before returning, so the next REST request and an
 already-open socket's next authentication frame both read the new credential.
 
-The target-independent state machine lives in `src/handoff/core.ts`. Its host
+The target-independent state machine lives in `src/handoff/core.js`. Its host
 boundary deliberately injects the parts JavaScript runtimes do not share:
 secure random bytes, SHA-256, transient verifier storage, and URL launching.
 The three supplied profiles are:
@@ -125,17 +126,19 @@ the backend's `swag` task, which `docs/findings.md` spells out.
 ts/
 ├── scripts/extract-swagger.mjs   Q5 — recover a description from swag's Go
 ├── src/handoff/                  PKCE coordinator + browser/Node/RN profiles
-├── src/rest/client.ts            hand-written host/session/error transport
-├── src/rest/generated.ts         generated component types + endpoint methods
-├── src/wire/code.ts              Q6 — the sealed and open bindings, side by side
-├── src/ws/protocol.ts            the envelope, hand-written from Go
-├── src/ws/fake-server.ts         the server model, corrected by the live run
-├── src/ws/live.ts                the live fixture driver and a real-socket client
-├── src/ws/session.ts             Q2/Q3 — the client state machine
+├── src/rest/client.js            hand-written host/session/error transport
+├── src/rest/generated.js         generated component types + endpoint methods
+├── src/wire/code.js              Q6 — the sealed and open bindings, side by side
+├── src/ws/protocol.js            the envelope, hand-written from Go
+├── src/ws/fake-server.js         the server model, corrected by the live run
+├── src/ws/live.js                the live fixture driver and a real-socket client
+├── src/ws/session.js             Q2/Q3 — the client state machine
 ├── test/                         the findings, as assertions
 └── fixtures/docs-excerpt.go.txt  hermetic input for the extractor
 ```
 
-`src/ws/session.ts` marks with `FORCED` every decision the protocol made for the
+Every `.js` module under `src/` and `test/` has a sibling `.d.ts`.
+
+`src/ws/session.js` marks with `FORCED` every decision the protocol made for the
 binding rather than left to it. Those comments are the finding; the code around
 them is just what it took to get there.
