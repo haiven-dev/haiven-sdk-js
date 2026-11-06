@@ -1,6 +1,6 @@
 {
 	"name": "@haiven/sdk-ts",
-	"version": "0.0.0",
+	"version": "0.1.0-preview.1",
 	"private": true,
 	"type": "module",
 	"description": "Haiven client SDK for TypeScript and JavaScript.",
