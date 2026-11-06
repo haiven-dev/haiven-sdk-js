@@ -190,6 +190,11 @@ export class RewardClaims {
         if (sessionGeneration !== this.sessionGeneration)
             throw new RewardClaimSessionChangedError();
         this.options.onSettled?.(outcome);
+        // onSettled may call clear() and switch players. The check above has
+        // already passed, so recheck before loot. Otherwise onClaimed grants
+        // the previous player's claim, and the check below throws only after.
+        if (sessionGeneration !== this.sessionGeneration)
+            throw new RewardClaimSessionChangedError();
         if (outcome.result === "claimed")
             this.options.onClaimed?.(outcome);
         if (sessionGeneration !== this.sessionGeneration)

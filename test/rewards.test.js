@@ -223,6 +223,43 @@ describe("reward claims", () => {
         });
         await assert.rejects(rewards.refresh(recorded("claim-1", "client_reported", "scarf")), RewardClaimSessionChangedError);
     });
+    it("does not grant loot when onSettled synchronously clears the session", async () => {
+        const playerBReply = deferredReply();
+        const peer = server([respond(201, recorded("claim-1", "client_reported", "scarf")), playerBReply.promise]);
+        let ids = 0;
+        let playerBClaim;
+        let rewards;
+        const claimed = [];
+        rewards = new RewardClaims(peer.api, {
+            integrationId: "game-1",
+            claimId: () => `claim-${++ids}`,
+            onSettled: (outcome) => {
+                if (outcome.claim?.claimId !== "claim-1")
+                    return;
+                rewards.clear();
+                playerBClaim = rewards.claim("scarf");
+            },
+            onClaimed: (outcome) => claimed.push(outcome.claim?.claimId ?? ""),
+        });
+        await assert.rejects(rewards.claim("scarf"), RewardClaimSessionChangedError);
+        assert.deepEqual(claimed, [], "the previous player's claim is not loot after the switch");
+        assert.equal(rewards.pending("scarf"), "claim-2");
+        playerBReply.resolve(respond(201, recorded("claim-2", "client_reported", "scarf")));
+        assert.equal((await playerBClaim).claim?.claimId, "claim-2");
+        assert.deepEqual(claimed, ["claim-2"]);
+    });
+    it("does not grant a refreshed claim when onSettled synchronously clears the session", async () => {
+        const peer = server([respond(200, recorded("claim-1", "server_confirmed", "scarf"))]);
+        let rewards;
+        const claimed = [];
+        rewards = new RewardClaims(peer.api, {
+            integrationId: "game-1",
+            onSettled: () => rewards.clear(),
+            onClaimed: (outcome) => claimed.push(outcome.claim?.claimId ?? ""),
+        });
+        await assert.rejects(rewards.refresh(recorded("claim-1", "client_reported", "scarf")), RewardClaimSessionChangedError);
+        assert.deepEqual(claimed, []);
+    });
     it("rejects a claim after a queued callback clear without deleting the next player's pending id", async () => {
         const playerBReply = deferredReply();
         const peer = server([respond(201, recorded("claim-1", "client_reported", "scarf")), playerBReply.promise]);

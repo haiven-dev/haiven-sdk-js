@@ -61,7 +61,7 @@ export type RewardClaimsOptions = {
     claimId?: () => string;
     /** Where saved intents survive a restart. Omitted, they last for this process. */
     storage?: RewardClaimIntentStore;
-    /** Called for every recorded claim, including a refreshed one. This is the loot signal. */
+    /** Called for a recorded claim that still belongs to this player after `onSettled`, including a refreshed one. This is the loot signal. */
     onClaimed?: (outcome: RewardClaimOutcome) => void;
     /** Called for every submitted claim that still belongs to this player, including a refusal. A refusal is not loot. */
     onSettled?: (outcome: RewardClaimOutcome) => void;
