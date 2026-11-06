@@ -19,7 +19,8 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { ModerationFixture, moderationUnavailable, operation, } from "../src/rest/moderation-fixture.js";
-const SUITE = new URL("../../../haiven-contracts/conformance/sdk/moderation/v0/generated/suite.json", import.meta.url).pathname;
+const CONTRACTS = process.env.HAIVEN_CONTRACTS_ROOT ?? new URL("../../haiven-contracts", import.meta.url).pathname;
+const SUITE = `${CONTRACTS}/conformance/sdk/moderation/v0/generated/suite.json`;
 const suite = JSON.parse(readFileSync(SUITE, "utf8"));
 /** This runner's name in the corpus, the same one the gaming runner answers to. */
 const RUNNER = "node";

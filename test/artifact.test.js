@@ -8,12 +8,13 @@ import { strict as assert } from "node:assert";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { extractFromFile, extractTemplate, fillPlaceholders, summarize, } from "../scripts/extract-swagger.mjs";
+import { backendDir } from "../src/ws/live.js";
 // Kept as `.go.txt` so Go tooling does not try to build a fixture that is
 // deliberately not part of any module.
 const FIXTURE = new URL("../fixtures/docs-excerpt.go.txt", import.meta.url).pathname;
 // The sibling checkout in the Haiven development workspace. Absent in this
 // repository's CI, which is why the fixture exists.
-const BACKEND_DOCS = new URL("../../../../haiven-api/cmd/server/docs/docs.go", import.meta.url).pathname;
+const BACKEND_DOCS = `${backendDir}/cmd/server/docs/docs.go`;
 describe("recovering a description from swag-generated Go", () => {
     it("rejoins the raw-string halves swag splits around a backtick", () => {
         const doc = extractFromFile(FIXTURE);

@@ -10,7 +10,8 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { Session } from "../src/ws/session.js";
-const SUITE = new URL("../../../conformance/gaming-client/v0/generated/suite.json", import.meta.url).pathname;
+const SDK = process.env.HAIVEN_SDK_ROOT ?? new URL("../../haiven-sdk", import.meta.url).pathname;
+const SUITE = `${SDK}/conformance/gaming-client/v0/generated/suite.json`;
 /** The names this runner answers to in a scenario's `waivers`. */
 const RUNNER = "node";
 const PROFILE = "gaming/node";

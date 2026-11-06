@@ -16,7 +16,8 @@ import { LiveFixture, liveUnavailable } from "../src/ws/live.js";
 // submodule. It used to be a local fork at conformance/corpus.json; that fork
 // drifted to assert a handshake the server stopped sending, and nobody saw it
 // because this runner was skipping on a stale backend path.
-const SUITE = new URL("../../../haiven-contracts/conformance/sdk/gaming/v0/generated/suite.json", import.meta.url).pathname;
+const CONTRACTS = process.env.HAIVEN_CONTRACTS_ROOT ?? new URL("../../haiven-contracts", import.meta.url).pathname;
+const SUITE = `${CONTRACTS}/conformance/sdk/gaming/v0/generated/suite.json`;
 const corpus = JSON.parse(readFileSync(SUITE, "utf8"));
 const unavailable = await liveUnavailable();
 describe("the conformance corpus, run by node", { skip: unavailable, timeout: 120_000 }, () => {

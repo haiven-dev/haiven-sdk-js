@@ -19,12 +19,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
-/** `haiven-dev/src/haiven-api`, two repositories up from `haiven-sdk/sdks/js/src/ws`. */
+/** Sibling `haiven-api`, one repository up from this checkout's `src/ws`. */
 // The sibling checkout is `haiven-api`; it was `backend` before the rename.
 // Getting this wrong does not fail — `liveUnavailable` reports "backend checkout
 // not found" and every live and conformance scenario skips, which is how four
 // stale expectations survived here for as long as they did.
-export const backendDir = process.env.HAIVEN_API_ROOT ?? path.resolve(here, "../../../../../haiven-api");
+export const backendDir = process.env.HAIVEN_API_ROOT ?? path.resolve(here, "../../../haiven-api");
 /**
  * Why the live tests may not run here.
  *

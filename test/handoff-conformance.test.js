@@ -7,7 +7,8 @@ import { describe, it } from "node:test";
 import { RestClient, RestError } from "../src/rest/client.js";
 import { HandoffFixture, } from "../src/rest/handoff-fixture.js";
 import { OpenCodec } from "../src/wire/code.js";
-const SUITE = new URL("../../../haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json", import.meta.url).pathname;
+const CONTRACTS = process.env.HAIVEN_CONTRACTS_ROOT ?? new URL("../../haiven-contracts", import.meta.url).pathname;
+const SUITE = `${CONTRACTS}/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json`;
 const suite = JSON.parse(readFileSync(SUITE, "utf8"));
 function resolve(value, fixture) {
     if (typeof value !== "string" || !value.startsWith("$"))
