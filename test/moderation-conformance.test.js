@@ -10,7 +10,7 @@
 // pointing them at another file; it needs a runner of a different shape, and
 // what that shape had to be is the measurement this file makes.
 //
-// The provider half already exists: `haiven-backend`'s
+// The provider half already exists: `haiven-api`'s
 // `internal/integration/sdkconformance` proves the surface answers this suite.
 // This is the consumer half — the same corpus, executed by the SDK side against
 // the same fixture, which is what makes the suite a shared obligation rather
@@ -19,7 +19,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { ModerationFixture, moderationUnavailable, operation, } from "../src/rest/moderation-fixture.js";
-const SUITE = new URL("../../haiven-sdk/haiven-contracts/conformance/sdk/moderation/v0/generated/suite.json", import.meta.url).pathname;
+const SUITE = new URL("../../../haiven-contracts/conformance/sdk/moderation/v0/generated/suite.json", import.meta.url).pathname;
 const suite = JSON.parse(readFileSync(SUITE, "utf8"));
 /** This runner's name in the corpus, the same one the gaming runner answers to. */
 const RUNNER = "node";

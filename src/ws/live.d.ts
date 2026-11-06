@@ -1,5 +1,5 @@
 import type { ClientFrame, RawServerFrame, SocketLike } from "./protocol.js";
-/** Sibling `haiven-backend`, one repository up from this checkout's `src/ws`. */
+/** `haiven-dev/src/haiven-api`, two repositories up from `haiven-sdk/sdks/js/src/ws`. */
 export declare const backendDir: string;
 /**
  * Why the live tests may not run here.

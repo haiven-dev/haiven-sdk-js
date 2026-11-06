@@ -6,13 +6,14 @@
 		"moduleResolution": "nodenext",
 
 		// Sources are JavaScript. Each module's sibling .d.ts is the type
-		// contract, and tsc only checks those declarations.
+		// contract, and tsc only checks those declarations. skipLibCheck stays
+		// off: it skips every .d.ts, which here would leave nothing to check.
 		"noEmit": true,
 		"strict": true,
 		"noUncheckedIndexedAccess": false,
 		"exactOptionalPropertyTypes": false,
 		"verbatimModuleSyntax": true,
-		"skipLibCheck": true,
+		"skipLibCheck": false,
 		"types": ["node"]
 	},
 	"include": ["src/**/*.d.ts", "test/**/*.d.ts"]

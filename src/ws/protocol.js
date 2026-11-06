@@ -6,6 +6,11 @@
 // upgraded to WebSocket"`. Everything below was read out of
 // backend/internal/platform/websocket/{handler,conn}.go by hand. That is the
 // concrete cost behind the AsyncAPI item in the plan.
+//
+// That item has since landed: haiven-contracts publishes
+// descriptions/websocket/public/gaming/v0/asyncapi.json, and codegen/emit_ws.py
+// generates the typed requests and event router in ./generated.js from it. The
+// envelope below stays hand-written because the session that reads it does.
 /**
  * Narrows a frame to the reply envelope.
  *

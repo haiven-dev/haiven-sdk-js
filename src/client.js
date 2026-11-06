@@ -33,9 +33,15 @@ import { Session } from "./ws/session.js";
 import { OpenCodec } from "./wire/code.js";
 export { RestClient, RestError } from "./rest/client.js";
 export * from "./handoff/index.js";
+export { FOUNDER_STATUS, findPlayerStatus, founderStatus, getGameAccess } from "./player-access.js";
 export * from "./rest/generated.js";
-export { Session } from "./ws/session.js";
+export { HaivenChat, outgoingStateFor } from "./chat.js";
+export { RewardClaims, RewardClaimSessionChangedError, browserRewardClaimStore, classifyRewardError, confirmReward, formatUuidV7, grantReward, memoryRewardClaimStore, newUuidV7, rewardConfirmation, } from "./rewards.js";
+export { Session, classifyClose, closeMayReconnect, closeRequiresSignIn } from "./ws/session.js";
+export * from "./ws/generated.js";
 export { OpenCodec } from "./wire/code.js";
+export { DecodeError, INTEGER_PRECISION_EXCEEDED } from "./wire/json.js";
+export { TelemetryReporter, } from "./telemetry.js";
 /**
  * A client over both transports, sharing one token and one vocabulary.
  *
@@ -85,6 +91,8 @@ export class HaivenClient {
             token: () => this.options.tokens.read() ?? "",
             vocabulary: this.options.vocabulary,
             requestId: this.options.requestId,
+            onEvent: this.options.onEvent,
+            retainEvents: this.options.retainEvents,
         });
         return this.sessionValue;
     }

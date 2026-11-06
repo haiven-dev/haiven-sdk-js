@@ -39,9 +39,14 @@ export type HandoffStart = {
 export type GameHandoffCredential = {
     accessToken: string;
     tokenType: string;
-    /** Absolute Unix time in milliseconds. */
-    expiresAt: number;
+    /**
+     * Absolute Unix time in milliseconds, or `null` for a durable credential
+     * that lasts until it is revoked (ADR 0041).
+     */
+    expiresAt: number | null;
 };
+/** Events that end an opaque handoff bearer and require a new handoff. */
+export type HandoffCredentialEndReason = "expired" | "rest-401" | "ws-expired";
 export declare class HandoffError extends Error {
     constructor(message: string, options?: ErrorOptions);
 }
@@ -55,10 +60,29 @@ export declare class HandoffError extends Error {
 export declare class HandoffCoordinator {
     private readonly rest;
     private readonly tokens;
+    private readonly linkedListeners;
     private readonly options;
     constructor(rest: RestClient, tokens: TokenStore, options: HandoffCoordinatorOptions);
     beginLogin(): Promise<HandoffStart>;
+    /**
+     * Reuses the credential the token store saved, so a restart does not send
+     * the player back to the browser. Call it before {@link beginLogin}; it
+     * returns `null` when nothing valid is saved, and the caller then begins a
+     * handoff. A saved credential past its expiry is cleared. A reused
+     * credential notifies {@link onLinked} like a completed handoff.
+     */
+    resume(): Promise<GameHandoffCredential | null>;
+    /**
+     * Clears the rejected bearer and starts a fresh handoff. Game credentials
+     * never enter the ordinary web refresh-token path.
+     */
+    restartLogin(reason: HandoffCredentialEndReason): Promise<HandoffStart>;
     complete(callbackUrl: string): Promise<GameHandoffCredential>;
+    /**
+     * Runs after a credential is stored or resumed. The access token is already
+     * visible to REST.
+     */
+    onLinked(listener: (credential: GameHandoffCredential) => Awaitable<void>): () => void;
     private buildAuthorizationUrl;
     private isExpectedCallback;
 }

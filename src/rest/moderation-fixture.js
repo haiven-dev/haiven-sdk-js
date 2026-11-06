@@ -1,5 +1,5 @@
 // The HTTP half of the live tier: `cmd/moderationfixture` in the sibling
-// `haiven-backend` checkout, which is `backend-moderation-fixture/v0` — the
+// `haiven-api` checkout, which is `backend-moderation-fixture/v0` — the
 // fixture `haiven-contracts/conformance/sdk/moderation/v0` names.
 //
 // Where `../ws/live.js` starts the real websocket stack and hands back a

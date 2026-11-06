@@ -13,7 +13,7 @@ import { extractFromFile, extractTemplate, fillPlaceholders, summarize, } from "
 const FIXTURE = new URL("../fixtures/docs-excerpt.go.txt", import.meta.url).pathname;
 // The sibling checkout in the Haiven development workspace. Absent in this
 // repository's CI, which is why the fixture exists.
-const BACKEND_DOCS = new URL("../../haiven-backend/cmd/server/docs/docs.go", import.meta.url).pathname;
+const BACKEND_DOCS = new URL("../../../../haiven-api/cmd/server/docs/docs.go", import.meta.url).pathname;
 describe("recovering a description from swag-generated Go", () => {
     it("rejoins the raw-string halves swag splits around a backtick", () => {
         const doc = extractFromFile(FIXTURE);
@@ -72,7 +72,7 @@ describe("what swag emits for a named string type, before correction", () => {
 // absent so this repository stays clonable on its own; the numbers recorded in
 // docs/findings.md come from here.
 const hasBackend = existsSync(BACKEND_DOCS);
-describe("the real backend surface", { skip: hasBackend ? false : "no ../haiven-backend checkout" }, () => {
+describe("the real backend surface", { skip: hasBackend ? false : "no ../haiven-api checkout" }, () => {
     it("is recoverable in full", () => {
         const doc = extractFromFile(BACKEND_DOCS);
         const s = summarize(doc);

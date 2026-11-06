@@ -10,6 +10,7 @@
 // surface costs a client *before* a generator hides it — a generated client
 // would paper over exactly the decisions recorded below.
 import { OpenCodec } from "../wire/code.js";
+import { decodeJson } from "../wire/json.js";
 import { RestApi } from "./generated.js";
 export * from "./generated.js";
 /**
@@ -33,11 +34,26 @@ export class RestError extends Error {
 }
 export class RestClient {
     options;
+    handoffUnauthorized = null;
     /** One generated, typed method for every operation in the pinned REST description. */
     endpoints;
     constructor(options) {
         this.options = options;
         this.endpoints = new RestApi(this);
+    }
+    /** Installs the game-credential 401 boundary; handoff never uses web refresh. */
+    setHandoffUnauthorizedHandler(handler) {
+        this.handoffUnauthorized = handler;
+    }
+    /**
+     * The absolute URL for an API path.
+     *
+     * For redirect-only operations such as SSO initiation: a browser must
+     * navigate there, because a fetch would follow the redirect into the
+     * provider's sign-in page and lose the federation cookie it sets.
+     */
+    url(path) {
+        return `${this.options.baseUrl}${path}`;
     }
     /**
      * Sends one request and returns its parsed body, or `null` when there is
@@ -55,7 +71,7 @@ export class RestClient {
             headers["Content-Type"] = contentType;
         if (token)
             headers.Authorization = `Bearer ${token}`;
-        const response = await this.options.fetch(`${this.options.baseUrl}${path}`, {
+        const response = await this.options.fetch(this.url(path), {
             method,
             headers,
             ...(body === undefined ? {} : { body: encodeRequestBody(body, contentType) }),
@@ -63,7 +79,10 @@ export class RestClient {
         // One retry, never a loop. A refresh that keeps failing against a revoked
         // session would otherwise retry forever, and the second failure is the
         // one worth reporting.
-        if (response.status === 401 && !retried && this.options.refresh) {
+        if (response.status === 401 && !retried && this.handoffUnauthorized) {
+            await this.handoffUnauthorized();
+        }
+        else if (response.status === 401 && !retried && this.options.refresh) {
             const refreshed = await this.options.refresh();
             this.options.tokens.write(refreshed);
             if (refreshed) {
@@ -110,7 +129,8 @@ async function readJson(response) {
     const raw = await response.text();
     if (raw === "")
         return null;
-    return JSON.parse(raw);
+    // Throws DecodeError (`integer_precision_exceeded`) rather than round an integer.
+    return decodeJson(raw);
 }
 function toError(codes, status, payload) {
     if (payload === null || typeof payload !== "object") {

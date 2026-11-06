@@ -2,14 +2,24 @@ import { RestClient, type FetchLike, type TokenStore } from "./rest/client.js";
 import { HandoffCoordinator, type HandoffCoordinatorOptions } from "./handoff/core.js";
 import { Session, type SessionOptions } from "./ws/session.js";
 import type { SocketLike } from "./ws/protocol.js";
-export type { FetchLike, ResponseLike, TokenStore } from "./rest/client.js";
+export type { FetchLike, ResponseLike, RestClientOptions, StoredCredential, TokenStore } from "./rest/client.js";
 export { RestClient, RestError } from "./rest/client.js";
 export * from "./handoff/index.js";
+export { FOUNDER_STATUS, findPlayerStatus, founderStatus, getGameAccess } from "./player-access.js";
 export * from "./rest/generated.js";
-export { Session } from "./ws/session.js";
-export type { SessionEvent, SessionState } from "./ws/session.js";
-export type { SocketLike } from "./ws/protocol.js";
+export { HaivenChat, outgoingStateFor } from "./chat.js";
+export type { HaivenChatOptions, OutgoingChatMessage, OutgoingChatState } from "./chat.js";
+export { RewardClaims, RewardClaimSessionChangedError, browserRewardClaimStore, classifyRewardError, confirmReward, formatUuidV7, grantReward, memoryRewardClaimStore, newUuidV7, rewardConfirmation, } from "./rewards.js";
+export type { RewardClaimIntentStore, RewardClaimOutcome, RewardClaimResult, RewardClaimsOptions, RewardConfirmation, SavedRewardClaim, } from "./rewards.js";
+export { Session, classifyClose, closeMayReconnect, closeRequiresSignIn } from "./ws/session.js";
+export * from "./ws/generated.js";
+export type { SessionClose, SessionCloseKind, SessionEvent, SessionOptions, SessionState, } from "./ws/session.js";
+export type { ClientFrame, DroppedFrames, RawServerFrame, ServerFrame, SocketLike, } from "./ws/protocol.js";
 export { OpenCodec } from "./wire/code.js";
+export type { ParsedCode } from "./wire/code.js";
+export { DecodeError, INTEGER_PRECISION_EXCEEDED } from "./wire/json.js";
+export type { DecodeErrorCode } from "./wire/json.js";
+export { TelemetryReporter, type TelemetryDiagnostic, type TelemetryEnvironment, type TelemetryErrorDetails, type TelemetryPlatform, type TelemetryReporterOptions, type TelemetryRuntime, type TelemetryTransport, } from "./telemetry.js";
 export type HaivenClientOptions = {
     /**
      * The REST root, including the version prefix — `https://api.haiven.ai/v0`.
@@ -56,6 +66,10 @@ export type HaivenClientOptions = {
     vocabulary: Iterable<string>;
     /** Injected so tests are deterministic; hosts pass `crypto.randomUUID`. */
     requestId?: SessionOptions["requestId"];
+    /** The host's subscription to session events; see `SessionOptions.onEvent`. */
+    onEvent?: SessionOptions["onEvent"];
+    /** See `SessionOptions.retainEvents`. */
+    retainEvents?: SessionOptions["retainEvents"];
 };
 /**
  * A client over both transports, sharing one token and one vocabulary.

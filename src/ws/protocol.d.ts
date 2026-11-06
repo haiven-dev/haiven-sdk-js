@@ -79,7 +79,7 @@ export declare const AUTH_EXPIRED = "auth.expired";
  */
 export declare const AUTH_EXPIRED_DROPPED = "auth.expired.dropped";
 /**
- * Payload of {@link AUTH_EXPIRED_DROPPED}.
+ * Payload of the `auth.expired.dropped` frame (`AUTH_EXPIRED_DROPPED`).
  *
  * `count` and `types` describe the loss; `requestIds` is the part of it a client
  * can act on. It used to report only the first two, so past the pump's bound a

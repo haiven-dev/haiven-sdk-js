@@ -1,4 +1,5 @@
 import type { ClientFrame, DroppedFrames, ServerFrame, SocketLike } from "./protocol.js";
+import type { DecodeErrorCode } from "../wire/json.js";
 export type SessionState = "pending" | "authenticated" | "expired" | "closed";
 export type SessionEvent = {
     kind: "state";
@@ -49,7 +50,58 @@ export type SessionEvent = {
  | {
     kind: "resending-blind";
     resending: readonly ClientFrame[];
+}
+/**
+ * A frame this SDK refused to decode, for example one carrying an integer
+ * beyond 2^53 - 1 that `JSON.parse` would round (`integer_precision_exceeded`).
+ * The frame is not delivered and the session stays open; `code` is finite and
+ * SDK-local, never a server code.
+ */
+ | {
+    kind: "decode-error";
+    code: DecodeErrorCode;
+    message: string;
 };
+/**
+ * What a socket close means for the credential that opened it. Finite and
+ * SDK-local: the server sends a close code and a reason string, and this is the
+ * part of them a game acts on.
+ *
+ * - `transport`: the connection ended for a reason unrelated to the credential
+ *   (network loss, a server restart, the caller's own close). The credential is
+ *   still good, and a new socket may authenticate with it, with no new sign-in.
+ * - `credential_refused`: `1008 unauthorized`, the server refused the credential
+ *   in the handshake (SDK-SESSION-5).
+ * - `credential_revoked`: `1008 credential_revoked`, the player or an operator
+ *   revoked the game credential while the socket was open (haiven-api
+ *   `docs/features/websocket.md`, Game sockets).
+ * - `policy`: any other `1008`, for example `parental_consent_denied` or a
+ *   contract the server does not serve. The server refused this socket for a
+ *   reason a new socket with the same credential does not change.
+ */
+export type SessionCloseKind = "transport" | "credential_refused" | "credential_revoked" | "policy";
+/** How a session's socket closed: the server's code and reason, and what they mean. */
+export type SessionClose = {
+    code: number;
+    reason: string;
+    kind: SessionCloseKind;
+};
+/**
+ * Classifies a close by its code and reason alone, so every binding reaches the
+ * same answer for the same close.
+ */
+export declare function classifyClose(code: number, reason: string): SessionCloseKind;
+/**
+ * True when the credential will not authenticate again: discard it and run the
+ * game login handoff before opening another socket. A reconnect with it would
+ * only be refused again.
+ */
+export declare function closeRequiresSignIn(kind: SessionCloseKind): boolean;
+/**
+ * True when a new socket may authenticate with the same credential. Only a
+ * transport close qualifies; reconnecting after any `1008` repeats the refusal.
+ */
+export declare function closeMayReconnect(kind: SessionCloseKind): boolean;
 export type SessionOptions = {
     socket: SocketLike;
     token: () => string;
@@ -57,6 +109,21 @@ export type SessionOptions = {
     vocabulary?: Iterable<string>;
     /** Injected so tests are deterministic; browsers get `crypto.randomUUID`. */
     requestId?: () => string;
+    /**
+     * Receives every event as it happens.
+     *
+     * A host needs a subscription, not a transcript. `events` is what a test
+     * reads afterwards; an application dispatching frames into its own state has
+     * nothing to poll and no moment at which to poll it. This was the first thing
+     * `packages/app` needed that the binding did not have.
+     */
+    onEvent?: (event: SessionEvent) => void;
+    /**
+     * Whether `events` keeps the transcript. On by default for the tests that
+     * read it; a long-lived session with an `onEvent` sink turns it off, because
+     * otherwise the array grows for the life of the connection.
+     */
+    retainEvents?: boolean;
 };
 export declare class Session {
     private readonly socket;
@@ -64,6 +131,7 @@ export declare class Session {
     private readonly nextRequestId;
     private readonly codec;
     private stateValue;
+    private closeValue;
     /**
      * FORCED. The socket is writable before it is usable — the server accepts
      * the TCP/WS upgrade, then reads exactly one frame and requires it to be
@@ -81,8 +149,16 @@ export declare class Session {
      */
     private readonly awaitingResend;
     readonly events: SessionEvent[];
+    private readonly onEvent;
+    private readonly retainEvents;
     constructor(options: SessionOptions);
     get state(): SessionState;
+    /**
+     * How the socket closed, once the session is `closed`. Set before the state
+     * change is announced, so a `closed` state handler can read it. A close the
+     * caller made through {@link close} is a `transport` close.
+     */
+    get lastClose(): SessionClose | undefined;
     /** Requests the caller made that the server accepted and then discarded. */
     get droppedRequests(): readonly ClientFrame[];
     /**
@@ -176,4 +252,5 @@ export declare class Session {
     private readonly inFlight;
     private write;
     private transition;
+    private emit;
 }

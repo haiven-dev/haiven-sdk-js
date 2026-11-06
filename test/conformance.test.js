@@ -16,7 +16,7 @@ import { LiveFixture, liveUnavailable } from "../src/ws/live.js";
 // submodule. It used to be a local fork at conformance/corpus.json; that fork
 // drifted to assert a handshake the server stopped sending, and nobody saw it
 // because this runner was skipping on a stale backend path.
-const SUITE = new URL("../../haiven-sdk/haiven-contracts/conformance/sdk/gaming/v0/generated/suite.json", import.meta.url).pathname;
+const SUITE = new URL("../../../haiven-contracts/conformance/sdk/gaming/v0/generated/suite.json", import.meta.url).pathname;
 const corpus = JSON.parse(readFileSync(SUITE, "utf8"));
 const unavailable = await liveUnavailable();
 describe("the conformance corpus, run by node", { skip: unavailable, timeout: 120_000 }, () => {
@@ -59,12 +59,17 @@ describe("the conformance corpus, run by node", { skip: unavailable, timeout: 12
         const missing = [...needed].filter((kind) => !tokens.supplies.includes(kind));
         assert.deepEqual(missing, [], "a scenario needs a token kind this runner cannot produce; waive it");
     });
-    it("costs a deployment runner one scenario, not all of them", () => {
+    it("costs a deployment runner only the scenarios that need a lapsed session", () => {
         // The measurement the kind split was made for, pinned so a regression to
-        // a ttl-shaped `auth` is visible here rather than in an argument.
+        // a ttl-shaped `auth` is visible here rather than in an argument. The list
+        // is the corpus's own set of `token: expired` scenarios, in corpus order:
+        // the lapsed handshake (SDK-SESSION-4) and the per-request refusal inside
+        // a lapsed session (SDK-SESSION-14). Both waive `deployment` for that
+        // reason. A new entry here is a scenario the corpus added that a
+        // deployment runner cannot reach, and it should be a deliberate edit.
         const deployment = ["valid"];
         const blocked = corpus.scenarios.filter((s) => s.steps.some((step) => step.do === "auth" && !deployment.includes(step.token ?? "valid")));
-        assert.deepEqual(blocked.map((s) => s.id), ["handshake-into-a-lapsed-session-says-so"]);
+        assert.deepEqual(blocked.map((s) => s.id), ["handshake-into-a-lapsed-session-says-so", "a-lapsed-session-refuses-each-request-by-name"]);
         for (const scenario of blocked) {
             assert.ok("deployment" in scenario.waivers, `${scenario.id}: needs a kind a deployment source lacks and does not waive deployment`);
         }

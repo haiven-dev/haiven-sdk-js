@@ -1,7 +1,7 @@
 // The live half of the socket spike: the same client, driven against the real
 // backend instead of the model in fake-server.js.
 //
-// `../../../backend/cmd/wsfixture` runs the real websocket stack — handler,
+// `../../../haiven-api/cmd/wsfixture` runs the real websocket stack — handler,
 // manager, cache subscriber, router, read loop, write pump — with the identity
 // provider, the one user row and the pub/sub broker stubbed. Nothing about the
 // protocol is stubbed, so what this file observes is evidence about the server
@@ -19,11 +19,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
-/** Sibling `haiven-backend`, one repository up from this checkout's `src/ws`. */
-// The directory was `backend` before the rename. One extra `..` walks out of
-// the parent that holds the sibling checkouts, so a missing backend is reported
-// at the wrong place and every live and conformance scenario skips.
-export const backendDir = process.env.HAIVEN_BACKEND ?? path.resolve(here, "../../../haiven-backend");
+/** `haiven-dev/src/haiven-api`, two repositories up from `haiven-sdk/sdks/js/src/ws`. */
+// The sibling checkout is `haiven-api`; it was `backend` before the rename.
+// Getting this wrong does not fail — `liveUnavailable` reports "backend checkout
+// not found" and every live and conformance scenario skips, which is how four
+// stale expectations survived here for as long as they did.
+export const backendDir = process.env.HAIVEN_API_ROOT ?? path.resolve(here, "../../../../../haiven-api");
 /**
  * Why the live tests may not run here.
  *

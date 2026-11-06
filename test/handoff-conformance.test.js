@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import { RestClient, RestError } from "../src/rest/client.js";
 import { HandoffFixture, } from "../src/rest/handoff-fixture.js";
 import { OpenCodec } from "../src/wire/code.js";
-const SUITE = new URL("../../haiven-sdk/haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json", import.meta.url).pathname;
+const SUITE = new URL("../../../haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json", import.meta.url).pathname;
 const suite = JSON.parse(readFileSync(SUITE, "utf8"));
 function resolve(value, fixture) {
     if (typeof value !== "string" || !value.startsWith("$"))
@@ -66,7 +66,9 @@ describe("the game auth handoff corpus, run by node", () => {
                     }
                     case "credential": {
                         token = fixture.credential(step.credential ?? "").access_token;
-                        await acceptRestError(client.endpoints.getAuthHandoffCredential());
+                        await acceptRestError(client.endpoints.getAuthHandoffCredential({
+                            integrationId: fixture.integration("primary").id,
+                        }));
                         break;
                     }
                     case "create": {

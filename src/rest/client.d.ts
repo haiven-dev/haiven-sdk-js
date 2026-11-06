@@ -35,9 +35,25 @@ export type TokenStore = {
     read(): string | null;
     /**
      * Writes the current access token. Handoff callers also provide its absolute
-     * expiry as Unix milliseconds; older stores may ignore that optional value.
+     * expiry as Unix milliseconds, or `null` for a credential with no fixed
+     * expiry (ADR 0041); older stores may ignore that optional value.
+     * `write(null, null)` clears the credential.
      */
     write(token: string | null, expiresAt?: number | null): void;
+    /**
+     * Returns the credential this store saved before the process started, or
+     * `null` when it saved none. Optional: a store without it keeps the
+     * credential in memory only, which suits development and tests, not a
+     * shipped game. `HandoffCoordinator.resume` calls it before any browser
+     * handoff.
+     */
+    load?(): StoredCredential | null | Promise<StoredCredential | null>;
+};
+/** A credential as a {@link TokenStore} saves it across restarts. */
+export type StoredCredential = {
+    token: string;
+    /** Absolute Unix time in milliseconds, or `null` when it has no fixed expiry. */
+    expiresAt: number | null;
 };
 export type RestClientOptions = {
     /**
@@ -85,9 +101,20 @@ export declare class RestError extends Error {
 }
 export declare class RestClient {
     private readonly options;
+    private handoffUnauthorized;
     /** One generated, typed method for every operation in the pinned REST description. */
     readonly endpoints: RestApi;
     constructor(options: RestClientOptions);
+    /** Installs the game-credential 401 boundary; handoff never uses web refresh. */
+    setHandoffUnauthorizedHandler(handler: (() => Promise<void>) | null): void;
+    /**
+     * The absolute URL for an API path.
+     *
+     * For redirect-only operations such as SSO initiation: a browser must
+     * navigate there, because a fetch would follow the redirect into the
+     * provider's sign-in page and lose the federation cookie it sets.
+     */
+    url(path: string): string;
     /**
      * Sends one request and returns its parsed body, or `null` when there is
      * none.
