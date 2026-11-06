@@ -112,4 +112,32 @@ describe("headless chat", () => {
         const second = connect(chat, "g-");
         assert.equal(second.socket.sends().length, 0, "a refused message is never resent");
     });
+    it("keeps a send across a correlated auth.expired and applies the resent reply", () => {
+        const chat = new HaivenChat({ clientMessageId: () => "cm-e" });
+        const { socket } = connect(chat, "e-");
+        const message = chat.send("ch-1", "during lapse");
+        const requestId = socket.sends()[0].requestId;
+        socket.receive({
+            type: "auth.expired",
+            requestId,
+            success: false,
+            error: "expired_token",
+        });
+        assert.equal(message.state, "sending", "auth.expired is not a chat refusal");
+        assert.equal(message.error, undefined);
+        const reauth = socket.sent.filter((frame) => frame.type === "auth").at(-1);
+        assert.ok(reauth, "the session reauthenticates on the same socket");
+        socket.receive({ type: "auth.success", requestId: reauth.requestId, success: true });
+        assert.equal(socket.sends().length, 2, "the named send is resent after reauthentication");
+        assert.equal(socket.sends()[1].requestId, requestId);
+        assert.equal(clientIdOf(socket.sends()[1]), "cm-e");
+        socket.receive({
+            type: "chat.send",
+            requestId,
+            success: true,
+            payload: { message: { id: "m-e", channelId: "ch-1" }, moderationState: "allowed" },
+        });
+        assert.equal(message.state, "accepted");
+        assert.equal(message.messageId, "m-e");
+    });
 });

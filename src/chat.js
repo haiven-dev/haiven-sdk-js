@@ -55,7 +55,11 @@ export class HaivenChat {
         if (event.kind !== "frame")
             return;
         const frame = event.frame;
-        if (frame.success !== undefined) {
+        // Only a chat.send reply settles a send. A correlated auth.expired
+        // carries success false and this request id, and Session emits that
+        // frame before it queues the send for resend. Settling it would drop
+        // the correlation, so the reply after reauthentication is ignored.
+        if (frame.type === "chat.send" && frame.success !== undefined) {
             this.reply(frame.requestId, frame.success, frame.error?.value, frame.payload);
             return;
         }
