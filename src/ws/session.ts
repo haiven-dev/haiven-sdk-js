@@ -23,6 +23,8 @@ import type {
 	SocketLike,
 } from "./protocol.ts"
 import { OpenCodec } from "../wire/code.ts"
+import { DecodeError, decodeJson } from "../wire/json.ts"
+import type { DecodeErrorCode } from "../wire/json.ts"
 
 export type SessionState =
 	| "pending" // socket open, auth frame not yet answered
@@ -59,6 +61,75 @@ export type SessionEvent =
 	 * reason the report says so rather than leaving a binding to guess (F12).
 	 */
 	| { kind: "resending-blind"; resending: readonly ClientFrame[] }
+	/**
+	 * A frame this SDK refused to decode, for example one carrying an integer
+	 * beyond 2^53 - 1 that `JSON.parse` would round (`integer_precision_exceeded`).
+	 * The frame is not delivered and the session stays open; `code` is finite and
+	 * SDK-local, never a server code.
+	 */
+	| { kind: "decode-error"; code: DecodeErrorCode; message: string }
+
+/**
+ * What a socket close means for the credential that opened it. Finite and
+ * SDK-local: the server sends a close code and a reason string, and this is the
+ * part of them a game acts on.
+ *
+ * - `transport`: the connection ended for a reason unrelated to the credential
+ *   (network loss, a server restart, the caller's own close). The credential is
+ *   still good, and a new socket may authenticate with it, with no new sign-in.
+ * - `credential_refused`: `1008 unauthorized`, the server refused the credential
+ *   in the handshake (SDK-SESSION-5).
+ * - `credential_revoked`: `1008 credential_revoked`, the player or an operator
+ *   revoked the game credential while the socket was open (haiven-api
+ *   `docs/features/websocket.md`, Game sockets).
+ * - `policy`: any other `1008`, for example `parental_consent_denied` or a
+ *   contract the server does not serve. The server refused this socket for a
+ *   reason a new socket with the same credential does not change.
+ */
+export type SessionCloseKind = "transport" | "credential_refused" | "credential_revoked" | "policy"
+
+/** How a session's socket closed: the server's code and reason, and what they mean. */
+export type SessionClose = {
+	code: number
+	reason: string
+	kind: SessionCloseKind
+}
+
+/** `websocket.StatusPolicyViolation`: every close the server makes on purpose. */
+const POLICY_VIOLATION = 1008
+
+/**
+ * Classifies a close by its code and reason alone, so every binding reaches the
+ * same answer for the same close.
+ */
+export function classifyClose(code: number, reason: string): SessionCloseKind {
+	if (code !== POLICY_VIOLATION) return "transport"
+	switch (reason) {
+		case "unauthorized":
+			return "credential_refused"
+		case "credential_revoked":
+			return "credential_revoked"
+		default:
+			return "policy"
+	}
+}
+
+/**
+ * True when the credential will not authenticate again: discard it and run the
+ * game login handoff before opening another socket. A reconnect with it would
+ * only be refused again.
+ */
+export function closeRequiresSignIn(kind: SessionCloseKind): boolean {
+	return kind === "credential_refused" || kind === "credential_revoked"
+}
+
+/**
+ * True when a new socket may authenticate with the same credential. Only a
+ * transport close qualifies; reconnecting after any `1008` repeats the refusal.
+ */
+export function closeMayReconnect(kind: SessionCloseKind): boolean {
+	return kind === "transport"
+}
 
 export type SessionOptions = {
 	socket: SocketLike
@@ -67,6 +138,21 @@ export type SessionOptions = {
 	vocabulary?: Iterable<string>
 	/** Injected so tests are deterministic; browsers get `crypto.randomUUID`. */
 	requestId?: () => string
+	/**
+	 * Receives every event as it happens.
+	 *
+	 * A host needs a subscription, not a transcript. `events` is what a test
+	 * reads afterwards; an application dispatching frames into its own state has
+	 * nothing to poll and no moment at which to poll it. This was the first thing
+	 * `packages/app` needed that the binding did not have.
+	 */
+	onEvent?: (event: SessionEvent) => void
+	/**
+	 * Whether `events` keeps the transcript. On by default for the tests that
+	 * read it; a long-lived session with an `onEvent` sink turns it off, because
+	 * otherwise the array grows for the life of the connection.
+	 */
+	retainEvents?: boolean
 }
 
 let counter = 0
@@ -79,6 +165,7 @@ export class Session {
 	private readonly codec: OpenCodec
 
 	private stateValue: SessionState = "pending"
+	private closeValue: SessionClose | undefined
 
 	/**
 	 * FORCED. The socket is writable before it is usable — the server accepts
@@ -99,12 +186,16 @@ export class Session {
 	private readonly awaitingResend: ClientFrame[] = []
 
 	readonly events: SessionEvent[] = []
+	private readonly onEvent: ((event: SessionEvent) => void) | undefined
+	private readonly retainEvents: boolean
 
 	constructor(options: SessionOptions) {
 		this.socket = options.socket
 		this.token = options.token
 		this.nextRequestId = options.requestId ?? defaultRequestId
 		this.codec = new OpenCodec(options.vocabulary ?? [])
+		this.onEvent = options.onEvent
+		this.retainEvents = options.retainEvents ?? true
 
 		this.socket.onopen = () => this.authenticate()
 		this.socket.onmessage = (event) => this.receive(event.data)
@@ -113,6 +204,15 @@ export class Session {
 
 	get state(): SessionState {
 		return this.stateValue
+	}
+
+	/**
+	 * How the socket closed, once the session is `closed`. Set before the state
+	 * change is announced, so a `closed` state handler can read it. A close the
+	 * caller made through {@link close} is a `transport` close.
+	 */
+	get lastClose(): SessionClose | undefined {
+		return this.closeValue
 	}
 
 	/** Requests the caller made that the server accepted and then discarded. */
@@ -137,6 +237,7 @@ export class Session {
 	close(code?: number, reason?: string): void {
 		if (this.stateValue === "closed") return
 
+		this.closeValue = { code: code ?? 1000, reason: reason ?? "", kind: "transport" }
 		this.transition("closed")
 		this.socket.close(code, reason)
 	}
@@ -161,7 +262,14 @@ export class Session {
 	}
 
 	private receive(data: string): void {
-		const raw = JSON.parse(data) as RawServerFrame
+		let raw: RawServerFrame
+		try {
+			raw = decodeJson(data) as RawServerFrame
+		} catch (error) {
+			if (!(error instanceof DecodeError)) throw error
+			this.emit({ kind: "decode-error", code: error.code, message: error.message })
+			return
+		}
 		// Spread-then-overwrite would add an explicit `error: undefined` to every
 		// success frame, which is not what arrived. Frames are compared field by
 		// field in tests and forwarded to callers, so the absent field has to
@@ -169,7 +277,7 @@ export class Session {
 		const frame: ServerFrame = { ...raw, error: undefined }
 		if (raw.error === undefined) delete frame.error
 		else frame.error = this.codec.parse(raw.error)
-		this.events.push({ kind: "frame", frame })
+		this.emit({ kind: "frame", frame })
 
 		switch (frame.type) {
 			case AUTH_SUCCESS:
@@ -200,7 +308,7 @@ export class Session {
 				// the binding stops retrying and hands it up — the one failure a
 				// client has to act on differently is finally distinguishable from
 				// the one it can recover from on its own.
-				this.events.push({ kind: "refresh-failed", code: frame.error })
+				this.emit({ kind: "refresh-failed", code: frame.error })
 				this.transition("expired")
 				return
 
@@ -270,14 +378,14 @@ export class Session {
 			this.inFlight.delete(requestId)
 			if (refused !== undefined) this.awaitingResend.push(refused)
 
-			this.events.push({ kind: "dropped-request", requestId, frame: refused })
+			this.emit({ kind: "dropped-request", requestId, frame: refused })
 		}
 
 		// One re-auth per episode. The server announces once, but a client sending
 		// several frames into a lapsed session is answered once per frame.
 		if (this.stateValue === "expired") return
 
-		this.events.push({ kind: "expired", resending: [] })
+		this.emit({ kind: "expired", resending: [] })
 
 		this.transition("expired")
 		// Re-auth on the *same* socket; the server never asked for a
@@ -312,7 +420,7 @@ export class Session {
 	private handleDropped(frame: ServerFrame): void {
 		const report = frame.payload as DroppedFrames
 
-		this.events.push({ kind: "dropped-report", report })
+		this.emit({ kind: "dropped-report", report })
 
 		const named: ClientFrame[] = []
 		for (const requestId of report.requestIds ?? []) {
@@ -320,7 +428,7 @@ export class Session {
 			this.inFlight.delete(requestId)
 			if (refused !== undefined) named.push(refused)
 
-			this.events.push({ kind: "dropped-request", requestId, frame: refused })
+			this.emit({ kind: "dropped-request", requestId, frame: refused })
 		}
 
 		// Read the remainder before resending anything: a resend goes back into
@@ -333,7 +441,7 @@ export class Session {
 
 		if (report.truncated !== true) return
 
-		this.events.push({ kind: "resending-blind", resending: suspect })
+		this.emit({ kind: "resending-blind", resending: suspect })
 		this.requeue(suspect)
 	}
 
@@ -353,8 +461,13 @@ export class Session {
 	private handleClose(event: { code: number; reason: string }): void {
 		// A failed handshake surfaces only here, as code 1008 with the reason
 		// string `unauthorized` — there is no `auth.failure` frame on that path.
+		// A revoked game credential closes an open socket with 1008
+		// `credential_revoked`. The kind tells the two apart from a dropped
+		// connection, which is the only close a reconnect can recover from.
+		if (this.stateValue === "closed") return
+
+		this.closeValue = { code: event.code, reason: event.reason, kind: classifyClose(event.code, event.reason) }
 		this.transition("closed")
-		void event
 	}
 
 	private flush(): void {
@@ -373,7 +486,16 @@ export class Session {
 
 	private transition(to: SessionState): void {
 		if (this.stateValue === to) return
-		this.events.push({ kind: "state", from: this.stateValue, to })
+		const from = this.stateValue
+		// State first, then the event: a sink that sends on `authenticated` must
+		// find the session already there, or its write lands in the pending queue
+		// it is about to flush.
 		this.stateValue = to
+		this.emit({ kind: "state", from, to })
+	}
+
+	private emit(event: SessionEvent): void {
+		if (this.retainEvents) this.events.push(event)
+		this.onEvent?.(event)
 	}
 }

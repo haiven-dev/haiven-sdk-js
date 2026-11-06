@@ -34,14 +34,63 @@ import { Session, type SessionOptions } from "./ws/session.ts"
 import type { SocketLike } from "./ws/protocol.ts"
 import { OpenCodec } from "./wire/code.ts"
 
-export type { FetchLike, ResponseLike, TokenStore } from "./rest/client.ts"
+export type { FetchLike, ResponseLike, RestClientOptions, StoredCredential, TokenStore } from "./rest/client.ts"
 export { RestClient, RestError } from "./rest/client.ts"
 export * from "./handoff/index.ts"
+export { FOUNDER_STATUS, findPlayerStatus, founderStatus, getGameAccess } from "./player-access.ts"
 export * from "./rest/generated.ts"
-export { Session } from "./ws/session.ts"
-export type { SessionEvent, SessionState } from "./ws/session.ts"
-export type { SocketLike } from "./ws/protocol.ts"
+export { HaivenChat, outgoingStateFor } from "./chat.ts"
+export type { HaivenChatOptions, OutgoingChatMessage, OutgoingChatState } from "./chat.ts"
+export {
+	RewardClaims,
+	RewardClaimSessionChangedError,
+	browserRewardClaimStore,
+	classifyRewardError,
+	confirmReward,
+	formatUuidV7,
+	grantReward,
+	memoryRewardClaimStore,
+	newUuidV7,
+	rewardConfirmation,
+} from "./rewards.ts"
+export type {
+	RewardClaimIntentStore,
+	RewardClaimOutcome,
+	RewardClaimResult,
+	RewardClaimsOptions,
+	RewardConfirmation,
+	SavedRewardClaim,
+} from "./rewards.ts"
+export { Session, classifyClose, closeMayReconnect, closeRequiresSignIn } from "./ws/session.ts"
+export * from "./ws/generated.ts"
+export type {
+	SessionClose,
+	SessionCloseKind,
+	SessionEvent,
+	SessionOptions,
+	SessionState,
+} from "./ws/session.ts"
+export type {
+	ClientFrame,
+	DroppedFrames,
+	RawServerFrame,
+	ServerFrame,
+	SocketLike,
+} from "./ws/protocol.ts"
 export { OpenCodec } from "./wire/code.ts"
+export type { ParsedCode } from "./wire/code.ts"
+export { DecodeError, INTEGER_PRECISION_EXCEEDED } from "./wire/json.ts"
+export type { DecodeErrorCode } from "./wire/json.ts"
+export {
+	TelemetryReporter,
+	type TelemetryDiagnostic,
+	type TelemetryEnvironment,
+	type TelemetryErrorDetails,
+	type TelemetryPlatform,
+	type TelemetryReporterOptions,
+	type TelemetryRuntime,
+	type TelemetryTransport,
+} from "./telemetry.ts"
 
 export type HaivenClientOptions = {
 	/**
@@ -96,6 +145,11 @@ export type HaivenClientOptions = {
 
 	/** Injected so tests are deterministic; hosts pass `crypto.randomUUID`. */
 	requestId?: SessionOptions["requestId"]
+
+	/** The host's subscription to session events; see `SessionOptions.onEvent`. */
+	onEvent?: SessionOptions["onEvent"]
+	/** See `SessionOptions.retainEvents`. */
+	retainEvents?: SessionOptions["retainEvents"]
 }
 
 /**
@@ -152,6 +206,8 @@ export class HaivenClient {
 			token: () => this.options.tokens.read() ?? "",
 			vocabulary: this.options.vocabulary,
 			requestId: this.options.requestId,
+			onEvent: this.options.onEvent,
+			retainEvents: this.options.retainEvents,
 		})
 
 		return this.sessionValue

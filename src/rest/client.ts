@@ -11,6 +11,7 @@
 // would paper over exactly the decisions recorded below.
 
 import { OpenCodec, type ParsedCode } from "../wire/code.ts"
+import { decodeJson } from "../wire/json.ts"
 import { RestApi, type RestRequestContentType } from "./generated.ts"
 
 export * from "./generated.ts"
@@ -48,9 +49,26 @@ export type TokenStore = {
 	read(): string | null
 	/**
 	 * Writes the current access token. Handoff callers also provide its absolute
-	 * expiry as Unix milliseconds; older stores may ignore that optional value.
+	 * expiry as Unix milliseconds, or `null` for a credential with no fixed
+	 * expiry (ADR 0041); older stores may ignore that optional value.
+	 * `write(null, null)` clears the credential.
 	 */
 	write(token: string | null, expiresAt?: number | null): void
+	/**
+	 * Returns the credential this store saved before the process started, or
+	 * `null` when it saved none. Optional: a store without it keeps the
+	 * credential in memory only, which suits development and tests, not a
+	 * shipped game. `HandoffCoordinator.resume` calls it before any browser
+	 * handoff.
+	 */
+	load?(): StoredCredential | null | Promise<StoredCredential | null>
+}
+
+/** A credential as a {@link TokenStore} saves it across restarts. */
+export type StoredCredential = {
+	token: string
+	/** Absolute Unix time in milliseconds, or `null` when it has no fixed expiry. */
+	expiresAt: number | null
 }
 
 export type RestClientOptions = {
@@ -109,12 +127,29 @@ type ErrorBody = { code?: unknown; message?: unknown }
 
 export class RestClient {
 	private readonly options: RestClientOptions
+	private handoffUnauthorized: (() => Promise<void>) | null = null
 	/** One generated, typed method for every operation in the pinned REST description. */
 	readonly endpoints: RestApi
 
 	constructor(options: RestClientOptions) {
 		this.options = options
 		this.endpoints = new RestApi(this)
+	}
+
+	/** Installs the game-credential 401 boundary; handoff never uses web refresh. */
+	setHandoffUnauthorizedHandler(handler: (() => Promise<void>) | null): void {
+		this.handoffUnauthorized = handler
+	}
+
+	/**
+	 * The absolute URL for an API path.
+	 *
+	 * For redirect-only operations such as SSO initiation: a browser must
+	 * navigate there, because a fetch would follow the redirect into the
+	 * provider's sign-in page and lose the federation cookie it sets.
+	 */
+	url(path: string): string {
+		return `${this.options.baseUrl}${path}`
 	}
 
 	/**
@@ -141,7 +176,7 @@ export class RestClient {
 		if (body !== undefined) headers["Content-Type"] = contentType
 		if (token) headers.Authorization = `Bearer ${token}`
 
-		const response = await this.options.fetch(`${this.options.baseUrl}${path}`, {
+		const response = await this.options.fetch(this.url(path), {
 			method,
 			headers,
 			...(body === undefined ? {} : { body: encodeRequestBody(body, contentType) }),
@@ -150,7 +185,9 @@ export class RestClient {
 		// One retry, never a loop. A refresh that keeps failing against a revoked
 		// session would otherwise retry forever, and the second failure is the
 		// one worth reporting.
-		if (response.status === 401 && !retried && this.options.refresh) {
+		if (response.status === 401 && !retried && this.handoffUnauthorized) {
+			await this.handoffUnauthorized()
+		} else if (response.status === 401 && !retried && this.options.refresh) {
 			const refreshed = await this.options.refresh()
 			this.options.tokens.write(refreshed)
 			if (refreshed) {
@@ -202,7 +239,8 @@ async function readJson(response: ResponseLike): Promise<unknown> {
 	const raw = await response.text()
 	if (raw === "") return null
 
-	return JSON.parse(raw)
+	// Throws DecodeError (`integer_precision_exceeded`) rather than round an integer.
+	return decodeJson(raw)
 }
 
 function toError(codes: OpenCodec, status: number, payload: unknown): RestError {

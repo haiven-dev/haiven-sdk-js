@@ -14,7 +14,7 @@ import {
 import { OpenCodec } from "../src/wire/code.ts"
 
 const SUITE = new URL(
-	"../../haiven-sdk/haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json",
+	"../../../haiven-contracts/conformance/sdk/gaming-auth-handoff/v0/generated/suite.json",
 	import.meta.url,
 ).pathname
 
@@ -107,7 +107,9 @@ describe("the game auth handoff corpus, run by node", () => {
 
 					case "credential": {
 						token = fixture.credential(step.credential ?? "").access_token
-						await acceptRestError(client.endpoints.getAuthHandoffCredential())
+						await acceptRestError(client.endpoints.getAuthHandoffCredential({
+							integrationId: fixture.integration("primary").id,
+						}))
 						break
 					}
 

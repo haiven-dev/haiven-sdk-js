@@ -8,7 +8,7 @@
 // info header, the same backtick-concatenation trick swag uses when a
 // description contains markdown, and a string enum carrying `x-enum-varnames`.
 //
-// It exists so the extractor is testable without a `../backend` checkout. The
+// It exists so the extractor is testable without a `../haiven-api` checkout. The
 // real measurements in docs/findings.md come from the real file; see
 // test/artifact.test.ts.
 package docs

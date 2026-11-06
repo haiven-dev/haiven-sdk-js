@@ -6,6 +6,11 @@
 // upgraded to WebSocket"`. Everything below was read out of
 // backend/internal/platform/websocket/{handler,conn}.go by hand. That is the
 // concrete cost behind the AsyncAPI item in the plan.
+//
+// That item has since landed: haiven-contracts publishes
+// descriptions/websocket/public/gaming/v0/asyncapi.json, and codegen/emit_ws.py
+// generates the typed requests and event router in ./generated.ts from it. The
+// envelope below stays hand-written because the session that reads it does.
 
 import type { ParsedCode } from "../wire/code.ts"
 
@@ -102,7 +107,7 @@ export const AUTH_EXPIRED = "auth.expired"
 export const AUTH_EXPIRED_DROPPED = "auth.expired.dropped"
 
 /**
- * Payload of {@link AUTH_EXPIRED_DROPPED}.
+ * Payload of the `auth.expired.dropped` frame (`AUTH_EXPIRED_DROPPED`).
  *
  * `count` and `types` describe the loss; `requestIds` is the part of it a client
  * can act on. It used to report only the first two, so past the pump's bound a

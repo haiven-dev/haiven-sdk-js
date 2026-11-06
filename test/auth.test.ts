@@ -11,7 +11,8 @@ import { strict as assert } from "node:assert"
 import { describe, it } from "node:test"
 
 import { FakeServerSocket, STATUS_POLICY_VIOLATION } from "../src/ws/fake-server.ts"
-import { Session } from "../src/ws/session.ts"
+import { Session, classifyClose, closeMayReconnect, closeRequiresSignIn } from "../src/ws/session.ts"
+import type { SessionCloseKind } from "../src/ws/session.ts"
 
 const GOOD = { value: "good-token", userId: "user-1", valid: true }
 const OTHER_USER = { value: "other-token", userId: "user-2", valid: true }
@@ -484,5 +485,77 @@ describe("close semantics", () => {
 
 		assert.equal(closeCode, STATUS_POLICY_VIOLATION)
 		assert.equal(session.state, "closed")
+	})
+
+	it("classifies a refused handshake as a refused credential", () => {
+		const { session } = connect({ token: () => REJECTED.value })
+
+		assert.deepEqual(session.lastClose, {
+			code: STATUS_POLICY_VIOLATION,
+			reason: "unauthorized",
+			kind: "credential_refused",
+		})
+		assert.equal(closeRequiresSignIn(session.lastClose!.kind), true)
+		assert.equal(closeMayReconnect(session.lastClose!.kind), false)
+	})
+
+	it("classifies a revoked game credential, and keeps it readable from the closed callback", () => {
+		const socket = new FakeServerSocket({ tokens: [GOOD] })
+		let seen: SessionCloseKind | undefined
+		const session = new Session({
+			socket,
+			token: () => GOOD.value,
+			onEvent: (event) => {
+				if (event.kind === "state" && event.to === "closed") seen = session.lastClose?.kind
+			},
+		})
+		socket.open()
+		assert.equal(session.state, "authenticated")
+		assert.equal(session.lastClose, undefined, "an open session has not closed")
+
+		socket.close(STATUS_POLICY_VIOLATION, "credential_revoked")
+
+		assert.equal(seen, "credential_revoked")
+		assert.equal(closeRequiresSignIn("credential_revoked"), true)
+		assert.equal(closeMayReconnect("credential_revoked"), false)
+	})
+
+	it("treats a dropped connection as one the credential survives", () => {
+		const socket = new FakeServerSocket({ tokens: [GOOD] })
+		const session = new Session({ socket, token: () => GOOD.value })
+		socket.open()
+
+		socket.close(1006, "")
+
+		assert.equal(session.lastClose?.kind, "transport")
+		assert.equal(closeRequiresSignIn("transport"), false)
+		assert.equal(closeMayReconnect("transport"), true)
+	})
+
+	it("reports the caller's own close as a transport close, and ignores the echo", () => {
+		const socket = new FakeServerSocket({ tokens: [GOOD] })
+		const session = new Session({ socket, token: () => GOOD.value })
+		socket.open()
+
+		session.close()
+
+		assert.deepEqual(session.lastClose, { code: 1000, reason: "", kind: "transport" })
+	})
+
+	it("classifies a close by its code and reason alone", () => {
+		for (const [code, reason, kind] of [
+			[1008, "unauthorized", "credential_refused"],
+			[1008, "credential_revoked", "credential_revoked"],
+			[1008, "parental_consent_denied", "policy"],
+			[1008, "minted_after_this_build", "policy"],
+			[1000, "", "transport"],
+			[1001, "going away", "transport"],
+			[1011, "internal_error", "transport"],
+			// A reason is only meaningful under 1008; the same text on another code is a transport close.
+			[1000, "credential_revoked", "transport"],
+		] as const) {
+			assert.equal(classifyClose(code, reason), kind, `${code} ${reason}`)
+			assert.equal(closeMayReconnect(kind), kind === "transport")
+		}
 	})
 })

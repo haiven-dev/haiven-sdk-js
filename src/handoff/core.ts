@@ -50,9 +50,15 @@ export type HandoffStart = {
 export type GameHandoffCredential = {
 	accessToken: string
 	tokenType: string
-	/** Absolute Unix time in milliseconds. */
-	expiresAt: number
+	/**
+	 * Absolute Unix time in milliseconds, or `null` for a durable credential
+	 * that lasts until it is revoked (ADR 0041).
+	 */
+	expiresAt: number | null
 }
+
+/** Events that end an opaque handoff bearer and require a new handoff. */
+export type HandoffCredentialEndReason = "expired" | "rest-401" | "ws-expired"
 
 export class HandoffError extends Error {
 	constructor(message: string, options?: ErrorOptions) {
@@ -71,6 +77,7 @@ export class HandoffError extends Error {
 export class HandoffCoordinator {
 	private readonly rest: RestClient
 	private readonly tokens: TokenStore
+	private readonly linkedListeners: Array<(credential: GameHandoffCredential) => Awaitable<void>> = []
 	private readonly options: Required<Pick<HandoffCoordinatorOptions, "transactionLifetimeMs" | "now">> &
 		Omit<HandoffCoordinatorOptions, "transactionLifetimeMs" | "now">
 
@@ -83,6 +90,9 @@ export class HandoffCoordinator {
 			now: options.now ?? Date.now,
 		}
 		validateOptions(this.options)
+		this.rest.setHandoffUnauthorizedHandler(async () => {
+			await this.restartLogin("rest-401")
+		})
 	}
 
 	async beginLogin(): Promise<HandoffStart> {
@@ -111,6 +121,47 @@ export class HandoffCoordinator {
 		}
 
 		return { authorizationUrl, state }
+	}
+
+	/**
+	 * Reuses the credential the token store saved, so a restart does not send
+	 * the player back to the browser. Call it before {@link beginLogin}; it
+	 * returns `null` when nothing valid is saved, and the caller then begins a
+	 * handoff. A saved credential past its expiry is cleared. A reused
+	 * credential notifies {@link onLinked} like a completed handoff.
+	 */
+	async resume(): Promise<GameHandoffCredential | null> {
+		const saved = this.tokens.load ? await this.tokens.load() : null
+		if (saved === null || saved === undefined) return null
+		const now = this.options.now()
+		if (
+			typeof saved.token !== "string" ||
+			saved.token.length === 0 ||
+			(saved.expiresAt !== null && !(typeof saved.expiresAt === "number" && now < saved.expiresAt))
+		) {
+			this.tokens.write(null, null)
+			return null
+		}
+		this.tokens.write(saved.token, saved.expiresAt)
+		const credential: GameHandoffCredential = {
+			accessToken: saved.token,
+			tokenType: "Bearer",
+			expiresAt: saved.expiresAt,
+		}
+		for (const listener of [...this.linkedListeners]) await listener(credential)
+		return credential
+	}
+
+	/**
+	 * Clears the rejected bearer and starts a fresh handoff. Game credentials
+	 * never enter the ordinary web refresh-token path.
+	 */
+	async restartLogin(reason: HandoffCredentialEndReason): Promise<HandoffStart> {
+		if (reason !== "expired" && reason !== "rest-401" && reason !== "ws-expired") {
+			throw new HandoffError("The handoff credential end reason is invalid.")
+		}
+		this.tokens.write(null, null)
+		return this.beginLogin()
 	}
 
 	async complete(callbackUrl: string): Promise<GameHandoffCredential> {
@@ -154,7 +205,20 @@ export class HandoffCoordinator {
 		})
 		const credential = parseCredential(response, this.options.now())
 		this.tokens.write(credential.accessToken, credential.expiresAt)
+		for (const listener of [...this.linkedListeners]) await listener(credential)
 		return credential
+	}
+
+	/**
+	 * Runs after a credential is stored or resumed. The access token is already
+	 * visible to REST.
+	 */
+	onLinked(listener: (credential: GameHandoffCredential) => Awaitable<void>): () => void {
+		this.linkedListeners.push(listener)
+		return () => {
+			const index = this.linkedListeners.indexOf(listener)
+			if (index >= 0) this.linkedListeners.splice(index, 1)
+		}
 	}
 
 	private buildAuthorizationUrl(state: string, challenge: string): string {
@@ -285,16 +349,19 @@ function parseCredential(value: unknown, now: number): GameHandoffCredential {
 		response.access_token.length === 0 ||
 		typeof response.token_type !== "string" ||
 		response.token_type.length === 0 ||
-		typeof response.expires_in !== "number" ||
-		!Number.isInteger(response.expires_in) ||
-		response.expires_in < 0
+		// `expires_in` is null for a durable credential (ADR 0041), and a whole
+		// number of seconds for a finite one.
+		(response.expires_in !== null &&
+			(typeof response.expires_in !== "number" ||
+				!Number.isInteger(response.expires_in) ||
+				response.expires_in < 0))
 	) {
 		throw new HandoffError("The handoff exchange returned an invalid credential.")
 	}
 	return {
 		accessToken: response.access_token,
 		tokenType: response.token_type,
-		expiresAt: now + response.expires_in * 1_000,
+		expiresAt: response.expires_in === null ? null : now + response.expires_in * 1_000,
 	}
 }
 

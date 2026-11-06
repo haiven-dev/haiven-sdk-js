@@ -1,0 +1,17 @@
+{
+	// The emitting configuration. tsconfig.json is check-only because Node runs
+	// the `.ts` sources directly; a host that is not this repository's test
+	// runner — `packages/app` is plain JS on Vite — needs ESM plus declarations,
+	// which is what `npm run build` emits into dist/ (ignored, never committed).
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"declaration": true,
+		// The sources import each other with explicit `.ts` extensions so Node
+		// can run them unbuilt; the emitted ESM has to say `.js` instead.
+		"rewriteRelativeImportExtensions": true,
+		"rootDir": "src",
+		"outDir": "dist"
+	},
+	"include": ["src"]
+}

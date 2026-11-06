@@ -10,7 +10,7 @@
 // pointing them at another file; it needs a runner of a different shape, and
 // what that shape had to be is the measurement this file makes.
 //
-// The provider half already exists: `haiven-backend`'s
+// The provider half already exists: `haiven-api`'s
 // `internal/integration/sdkconformance` proves the surface answers this suite.
 // This is the consumer half — the same corpus, executed by the SDK side against
 // the same fixture, which is what makes the suite a shared obligation rather
@@ -28,7 +28,7 @@ import {
 } from "../src/rest/moderation-fixture.ts"
 
 const SUITE = new URL(
-	"../../haiven-sdk/haiven-contracts/conformance/sdk/moderation/v0/generated/suite.json",
+	"../../../haiven-contracts/conformance/sdk/moderation/v0/generated/suite.json",
 	import.meta.url,
 ).pathname
 

@@ -30,6 +30,17 @@ function clientOf(bodies: unknown[]) {
 }
 
 describe("the generated REST operations", () => {
+	it("reads the Message of the Day before sign-in, by integration id", async () => {
+		const motd = { id: "m1", body: "New rewards are live.", startsAt: "2026-10-03T00:00:00Z" }
+		const { client, sent } = clientOf([motd])
+
+		const got = await client.endpoints.getMotd({ integrationId: "partner game" })
+
+		assert.equal(sent[0].method, "GET")
+		assert.equal(sent[0].url, "https://api.example/v0/motd?integration_id=partner%20game")
+		assert.deepEqual(got, motd)
+	})
+
 	it("encodes path and optional query parameters", async () => {
 		const { client, sent } = clientOf([{ messages: [] }])
 
@@ -81,5 +92,42 @@ describe("the generated REST operations", () => {
 		)
 		assert.deepEqual(result, { access_token: "access", expires_in: 300, token_type: "Bearer" })
 		assert.equal("refresh_token" in (result ?? {}), false)
+	})
+
+	it("reads the account entitlements (inventory) snapshot", async () => {
+		const { client, sent } = clientOf([
+			{ asOf: "2026-10-02T00:00:00Z", projectionVersion: 7, entitlements: [{ code: "sword", kind: "item", state: "active" }] },
+		])
+
+		const result = await client.endpoints.getUsersMeEntitlements()
+
+		assert.equal(sent[0]?.url, "https://api.example/v0/users/me/entitlements")
+		assert.equal(sent[0]?.method, "GET")
+		assert.equal(result?.projectionVersion, 7)
+		assert.equal(result?.entitlements?.[0]?.kind, "item")
+	})
+
+	it("builds SSO initiation as a browser URL rather than fetching the redirect", () => {
+		const { client, sent } = clientOf([])
+
+		assert.equal(
+			client.endpoints.getAuthSsoProviderUrl({
+				provider: "google",
+				codeChallenge: "challenge",
+				codeChallengeMethod: "S256",
+			}),
+			"https://api.example/v0/auth/sso/google?code_challenge=challenge&code_challenge_method=S256",
+		)
+		assert.equal(sent.length, 0)
+	})
+
+	it("starts an SSO provider link for the signed-in account", async () => {
+		const { client, sent } = clientOf([{ redirectUrl: "https://auth.example/authorize" }])
+
+		const result = await client.endpoints.postUsersMeSignInMethodsSsoProvider({ provider: "apple" })
+
+		assert.equal(sent[0]?.url, "https://api.example/v0/users/me/sign-in-methods/sso/apple")
+		assert.equal(sent[0]?.method, "POST")
+		assert.equal(result?.redirectUrl, "https://auth.example/authorize")
 	})
 })

@@ -12,6 +12,7 @@ import {
 	type HandoffHost,
 	type HandoffKeyValueStore,
 	type ResponseLike,
+	type StoredCredential,
 	type TokenStore,
 } from "../src/client.ts"
 import { FakeServerSocket } from "../src/ws/fake-server.ts"
@@ -154,7 +155,11 @@ describe("the TypeScript game-login handoff", () => {
 	})
 
 	it("validates callback target and state before exchange, then consumes state once", async () => {
-		const { client, requests, tokens } = clientHarness()
+		const { client, requests, tokens } = clientHarness({
+			access_token: "header.eyJleHAiOjF9.signature",
+			token_type: "Bearer",
+			expires_in: 300,
+		})
 		const coordinator = client.createHandoff({
 			entryUrl: ENTRY,
 			integrationId: "example-game",
@@ -171,17 +176,28 @@ describe("the TypeScript game-login handoff", () => {
 		await assert.rejects(coordinator.complete(callback("attacker-state")), HandoffError)
 		assert.equal(requests.length, 0, "untrusted callbacks never reach the exchange")
 
+		let linked = false
+		coordinator.onLinked(() => {
+			linked = true
+			assert.equal(
+				tokens.credential().token,
+				"header.eyJleHAiOjF9.signature",
+				"the listener runs after the token is stored",
+			)
+		})
 		const credential = await coordinator.complete(callback(start.state))
+		assert.equal(linked, true, "a completed handoff notifies onLinked")
 		assert.deepEqual(credential, {
-			accessToken: "handoff-access",
+			accessToken: "header.eyJleHAiOjF9.signature",
 			tokenType: "Bearer",
 			expiresAt: NOW + 300_000,
 		})
 		assert.deepEqual(tokens.credential(), {
-			token: "handoff-access",
+			token: "header.eyJleHAiOjF9.signature",
 			expiresAt: NOW + 300_000,
 		})
 		assert.equal(requests.length, 1)
+		assert.notEqual(credential.expiresAt, 1_000, "JWT-shaped bearer claims are ignored")
 		assert.equal(requests[0]?.headers["Content-Type"], "application/x-www-form-urlencoded")
 		const form = new URLSearchParams(requests[0]?.body)
 		assert.deepEqual([...form.keys()], ["code", "code_verifier", "integration_id", "redirect_uri"])
@@ -192,6 +208,66 @@ describe("the TypeScript game-login handoff", () => {
 
 		await assert.rejects(coordinator.complete(callback(start.state)), HandoffError)
 		assert.equal(requests.length, 1, "a replay is rejected without a second exchange")
+	})
+
+	it("clears and re-handoffs for expiry, REST 401, and WebSocket expiry", async () => {
+		for (const reason of ["expired", "rest-401", "ws-expired"] as const) {
+			const opened: string[] = []
+			const { client, tokens } = clientHarness()
+			const coordinator = client.createHandoff({
+				entryUrl: ENTRY,
+				integrationId: "example-game",
+				redirectUrl: REDIRECT,
+				now: () => NOW,
+				host: {
+					...nodeHandoffHost(),
+					launchUrl: (url) => {
+						opened.push(url)
+					},
+				},
+			})
+
+			const restarted = await coordinator.restartLogin(reason)
+			assert.equal(tokens.read(), null, `${reason} clears the old bearer`)
+			assert.equal(opened.length, 1, `${reason} launches a new handoff`)
+			assert.equal(new URL(opened[0] ?? "").searchParams.get("state"), restarted.state)
+		}
+	})
+
+	it("turns REST 401 into re-handoff without calling web refresh", async () => {
+		const opened: string[] = []
+		let refreshes = 0
+		const tokens = tokenStore()
+		tokens.write("opaque-game-bearer", NOW + 300_000)
+		const client = new HaivenClient({
+			baseUrl: "https://api.haiven.gg/v0",
+			socketUrl: "wss://api.haiven.gg/v0/ws",
+			tokens,
+			vocabulary: ["unauthorized"],
+			fetch: async () => response(401, { code: "unauthorized" }),
+			refresh: async () => {
+				refreshes++
+				return "web-token"
+			},
+			connect: () => new FakeServerSocket({ tokens: [] }),
+		})
+		client.createHandoff({
+			entryUrl: ENTRY,
+			integrationId: "example-game",
+			redirectUrl: REDIRECT,
+			now: () => NOW,
+			host: {
+				...nodeHandoffHost(),
+				launchUrl: (url) => {
+					opened.push(url)
+				},
+			},
+		})
+
+		await assert.rejects(client.rest.request("/users/me"), /HTTP 401/)
+		assert.equal(refreshes, 0)
+		assert.equal(tokens.read(), null)
+		assert.equal(opened.length, 1)
 	})
 
 	it("expires verifier state and rejects refresh credentials", async () => {
@@ -226,6 +302,175 @@ describe("the TypeScript game-login handoff", () => {
 		const forbiddenStart = await forbiddenCoordinator.beginLogin()
 		await assert.rejects(forbiddenCoordinator.complete(callback(forbiddenStart.state)), /refresh/)
 		assert.equal(forbidden.tokens.read(), "old-access")
+	})
+})
+
+/** A token store that survives a restart: `load` returns what an earlier process saved. */
+function savedTokenStore(
+	saved: StoredCredential | null,
+): RecordingTokens & { loads: number; load(): Promise<StoredCredential | null> } {
+	const tokens = tokenStore("")
+	tokens.write(null, null)
+	let persisted = saved
+	const store = {
+		...tokens,
+		loads: 0,
+		write: (next: string | null, expiry: number | null = null) => {
+			tokens.write(next, expiry)
+			persisted = next === null ? null : { token: next, expiresAt: expiry }
+		},
+		load: async () => {
+			store.loads++
+			return persisted
+		},
+		credential: tokens.credential,
+		read: tokens.read,
+	}
+	return store
+}
+
+function resumeHarness(tokens: TokenStore) {
+	const opened: string[] = []
+	const requests: Request[] = []
+	const client = new HaivenClient({
+		baseUrl: "https://api.haiven.gg/v0",
+		socketUrl: "wss://api.haiven.gg/v0/ws",
+		tokens,
+		vocabulary: ["unauthorized"],
+		fetch: async (url, init) => {
+			requests.push({ url, ...init })
+			return response(200, { ok: true })
+		},
+		connect: () => new FakeServerSocket({ tokens: [] }),
+	})
+	const coordinator = client.createHandoff({
+		entryUrl: ENTRY,
+		integrationId: "example-game",
+		redirectUrl: REDIRECT,
+		now: () => NOW,
+		host: {
+			...nodeHandoffHost(),
+			launchUrl: (url) => {
+				opened.push(url)
+			},
+		},
+	})
+	return { client, coordinator, opened, requests }
+}
+
+describe("the TypeScript durable game credential (ADR 0041)", () => {
+	it("accepts a null expires_in as a credential with no fixed expiry", async () => {
+		const { client, tokens } = clientHarness({
+			access_token: "durable-access",
+			token_type: "Bearer",
+			expires_in: null,
+		})
+		const coordinator = client.createHandoff({
+			entryUrl: ENTRY,
+			integrationId: "example-game",
+			redirectUrl: REDIRECT,
+			now: () => NOW,
+			host: nodeHandoffHost(),
+		})
+		const start = await coordinator.beginLogin()
+		const credential = await coordinator.complete(callback(start.state))
+		assert.deepEqual(credential, { accessToken: "durable-access", tokenType: "Bearer", expiresAt: null })
+		assert.deepEqual(tokens.credential(), { token: "durable-access", expiresAt: null })
+	})
+
+	it("still refuses an expires_in that is missing or not a whole number of seconds", async () => {
+		for (const expires of [undefined, "300", 1.5, -1]) {
+			const body: Record<string, unknown> = { access_token: "handoff-access", token_type: "Bearer" }
+			if (expires !== undefined) body.expires_in = expires
+			const { client, tokens } = clientHarness(body)
+			const coordinator = client.createHandoff({
+				entryUrl: ENTRY,
+				integrationId: "example-game",
+				redirectUrl: REDIRECT,
+				now: () => NOW,
+				host: nodeHandoffHost(),
+			})
+			const start = await coordinator.beginLogin()
+			await assert.rejects(coordinator.complete(callback(start.state)), /invalid credential/, String(expires))
+			assert.equal(tokens.read(), "old-access")
+		}
+	})
+
+	it("reuses a saved credential at start instead of opening the browser", async () => {
+		for (const expiresAt of [null, NOW + 60_000]) {
+			const tokens = savedTokenStore({ token: "saved-access", expiresAt })
+			const { client, coordinator, opened, requests } = resumeHarness(tokens)
+			let linked: unknown = null
+			coordinator.onLinked((credential) => {
+				linked = credential
+			})
+
+			const resumed = await coordinator.resume()
+
+			assert.deepEqual(resumed, { accessToken: "saved-access", tokenType: "Bearer", expiresAt })
+			assert.deepEqual(linked, resumed, "a resumed credential notifies onLinked")
+			assert.equal(opened.length, 0, "no browser handoff while a valid credential is saved")
+			assert.equal(tokens.loads, 1)
+			await client.rest.request("/users/me")
+			assert.equal(requests[0]?.headers.Authorization, "Bearer saved-access")
+		}
+	})
+
+	it("clears a saved credential that has expired or is malformed, then hands off", async () => {
+		const saved = [
+			{ token: "saved-access", expiresAt: NOW },
+			{ token: "", expiresAt: null },
+			{ token: "saved-access", expiresAt: "never" },
+		] as unknown as StoredCredential[]
+		for (const credential of saved) {
+			const tokens = savedTokenStore(credential)
+			const { coordinator, opened } = resumeHarness(tokens)
+
+			assert.equal(await coordinator.resume(), null)
+			assert.equal(await tokens.load(), null, "the unusable credential is cleared from the store")
+			assert.equal(tokens.read(), null)
+			await coordinator.beginLogin()
+			assert.equal(opened.length, 1)
+		}
+	})
+
+	it("resumes nothing from a store that saves nothing or has no load", async () => {
+		const empty = savedTokenStore(null)
+		assert.equal(await resumeHarness(empty).coordinator.resume(), null)
+
+		const memoryOnly = tokenStore("in-memory")
+		assert.equal(await resumeHarness(memoryOnly).coordinator.resume(), null)
+		assert.equal(memoryOnly.read(), "in-memory", "a store without load is left alone")
+	})
+
+	it("clears the saved credential on REST 401 so the next start hands off", async () => {
+		const tokens = savedTokenStore({ token: "revoked-access", expiresAt: null })
+		const opened: string[] = []
+		const client = new HaivenClient({
+			baseUrl: "https://api.haiven.gg/v0",
+			socketUrl: "wss://api.haiven.gg/v0/ws",
+			tokens,
+			vocabulary: ["unauthorized"],
+			fetch: async () => response(401, { code: "unauthorized" }),
+			connect: () => new FakeServerSocket({ tokens: [] }),
+		})
+		const coordinator = client.createHandoff({
+			entryUrl: ENTRY,
+			integrationId: "example-game",
+			redirectUrl: REDIRECT,
+			now: () => NOW,
+			host: {
+				...nodeHandoffHost(),
+				launchUrl: (url) => {
+					opened.push(url)
+				},
+			},
+		})
+		assert.notEqual(await coordinator.resume(), null)
+
+		await assert.rejects(client.rest.request("/users/me"), /HTTP 401/)
+		assert.equal(await tokens.load(), null)
+		assert.equal(opened.length, 1)
 	})
 })
 
