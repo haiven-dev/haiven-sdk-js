@@ -27,6 +27,12 @@
 	},
 	"files": [
 		"src",
+		"!src/ws/live.js",
+		"!src/ws/live.d.ts",
+		"!src/rest/moderation-fixture.js",
+		"!src/rest/moderation-fixture.d.ts",
+		"!src/rest/handoff-fixture.js",
+		"!src/rest/handoff-fixture.d.ts",
 		"README.md"
 	],
 	"scripts": {
