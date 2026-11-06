@@ -5,19 +5,16 @@
 		"module": "nodenext",
 		"moduleResolution": "nodenext",
 
-		// Node runs the .ts sources directly by stripping types, so nothing here
-		// emits. `tsc` is only ever a checker in this spike, which is also why
-		// the source imports carry explicit `.ts` extensions.
+		// Sources are JavaScript. Each module's sibling .d.ts is the type
+		// contract, and tsc only checks those declarations. skipLibCheck stays
+		// off: it skips every .d.ts, which here would leave nothing to check.
 		"noEmit": true,
-		"allowImportingTsExtensions": true,
-		"allowJs": true,
-
 		"strict": true,
 		"noUncheckedIndexedAccess": false,
 		"exactOptionalPropertyTypes": false,
 		"verbatimModuleSyntax": true,
-		"skipLibCheck": true,
+		"skipLibCheck": false,
 		"types": ["node"]
 	},
-	"include": ["src", "test", "scripts"]
+	"include": ["src/**/*.d.ts", "test/**/*.d.ts"]
 }

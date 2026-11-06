@@ -1,17 +1,47 @@
 {
-	"name": "@haiven/sdk-spike-ts",
+	"name": "@haiven/sdk-ts",
+	"version": "0.1.0-preview.1",
 	"private": true,
 	"type": "module",
-	"description": "TypeScript spike — what does binding the Haiven API from TS actually cost?",
+	"description": "Haiven client SDK for JavaScript, with TypeScript declarations.",
 	"engines": {
 		"node": ">=22.18"
 	},
+	"exports": {
+		".": {
+			"types": "./src/client.d.ts",
+			"default": "./src/client.js"
+		},
+		"./contracts": {
+			"types": "./src/contracts.d.ts",
+			"default": "./src/contracts.js"
+		},
+		"./vocabulary": {
+			"types": "./src/vocabulary.d.ts",
+			"default": "./src/vocabulary.js"
+		},
+		"./testing": {
+			"types": "./src/ws/fake-server.d.ts",
+			"default": "./src/ws/fake-server.js"
+		}
+	},
+	"files": [
+		"src",
+		"!src/ws/live.js",
+		"!src/ws/live.d.ts",
+		"!src/rest/moderation-fixture.js",
+		"!src/rest/moderation-fixture.d.ts",
+		"!src/rest/handoff-fixture.js",
+		"!src/rest/handoff-fixture.d.ts",
+		"README.md"
+	],
 	"scripts": {
-		"test": "node --test \"test/**/*.test.ts\"",
+		"test": "node --test \"test/**/*.test.js\"",
 		"typecheck": "tsc --noEmit",
 		"extract": "node scripts/extract-swagger.mjs"
 	},
 	"devDependencies": {
+		"@types/node": "24.19.2",
 		"typescript": "5.9.3"
 	}
 }
