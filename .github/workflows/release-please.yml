@@ -2,8 +2,9 @@ name: release-please
 
 # Runs on main alone (the haiven-docs contribution standard): sdk-dev takes the work,
 # an sdk-dev -> main promotion lands it, and this opens the release pull request that
-# bumps version.txt, CHANGELOG.md, the manifest and every engine's version string.
-# Merging that pull request tags v<version> and publishes the GitHub release.
+# bumps CHANGELOG.md, .release-please-manifest.json, package.json, and
+# package-lock.json. Merging that pull request tags v<version> and publishes
+# the GitHub release.
 on:
   push:
     branches: [main]
