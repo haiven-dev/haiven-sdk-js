@@ -23,14 +23,20 @@ you open the pull request. Before you push, rebase onto the current
 `sdk-dev`; do not merge `sdk-dev` into your branch. Say what changed and
 how you checked it. Keep the change focused.
 
-Pull requests into `sdk-dev` are squash-merged, so the pull request title
-becomes the commit subject. Give the title a
-[Conventional Commits](https://www.conventionalcommits.org/) subject:
+Pull requests into `sdk-dev` are squash-merged. For a pull request with one
+commit, GitHub uses that commit's subject as the squash commit subject.
+Otherwise it uses the pull request title. So give the title and every commit
+subject the [Conventional Commits](https://www.conventionalcommits.org/)
+format:
 
 `type(scope): subject`
 
 `type` is one of `feat`, `fix`, `docs`, `deps`, `style`, `refactor`,
-`perf`, `test`, `build`, `ci`, `chore`, or `revert`. `scope` is optional.
+`perf`, `test`, `build`, `ci`, `chore`, `revert`, or `wip`. `scope` is
+optional. A breaking change puts `!` immediately before the colon, in the
+commit subject and the pull request title:
+
+`type(scope)!: subject`
 
 Releases are cut from `main`. `sdk-dev` reaches `main` through a pull
 request merged with a merge commit, never a squash, and after each release
