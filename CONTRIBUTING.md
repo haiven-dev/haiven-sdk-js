@@ -17,15 +17,24 @@ Code from outside Haiven is not accepted until a license file is in the
 repository. Until then, use GitHub issues for bug reports and questions.
 Do not open a pull request that changes this repository.
 
-Haiven changes branch from `main` and use a
+Haiven changes branch from `sdk-dev` and open their pull request against
+`sdk-dev`. `main` is the default branch, so set the base to `sdk-dev` when
+you open the pull request. Before you push, rebase onto the current
+`sdk-dev`; do not merge `sdk-dev` into your branch. Say what changed and
+how you checked it. Keep the change focused.
+
+Pull requests into `sdk-dev` are squash-merged, so the pull request title
+becomes the commit subject. Give the title a
 [Conventional Commits](https://www.conventionalcommits.org/) subject:
 
 `type(scope): subject`
 
 `type` is one of `feat`, `fix`, `docs`, `deps`, `style`, `refactor`,
 `perf`, `test`, `build`, `ci`, `chore`, or `revert`. `scope` is optional.
-Open the pull request against `main`. Say what changed and how you checked
-it. Keep the change focused.
+
+Releases are cut from `main`. `sdk-dev` reaches `main` through a pull
+request merged with a merge commit, never a squash, and after each release
+`main` is merged back into `sdk-dev` with a merge commit.
 
 Do not commit access tokens, passwords, private endpoints, or local
 credentials. Do not add fixtures from outside this repository to make a
@@ -34,22 +43,19 @@ test pass.
 ## Checks
 
 Node.js 22.18 or newer, as `package.json` requires. From the repository
-root:
+root, install the dev dependencies (`typescript` and `@types/node`), then
+type-check the declarations and run the tests:
 
 ```sh
+npm ci
+npm run typecheck
 npm test
 ```
 
-That runs `node --test "test/**/*.test.ts"`. In a standalone clone, three
-tests currently throw because they read a fixture this repository does not
-contain, before they can skip. Do not satisfy them by vendoring that
-fixture. Say which tests you ran.
-
-`npm install` does not install `@types/node`. `tsconfig.json` sets
-`"types": ["node"]`, so `npm run typecheck` fails with `TS2688` after that
-install. Install the checker and `@types/node`, then typecheck:
-
-```sh
-npm install --no-save typescript@5.9.3 @types/node
-npm run typecheck
-```
+`npm test` runs `node --test "test/**/*.test.js"`. In a standalone clone,
+four test files currently fail at load, before they can skip, because each
+reads a conformance suite from a private Haiven checkout this repository
+does not contain: `test/conformance.test.js`,
+`test/handoff-conformance.test.js`, `test/moderation-conformance.test.js`,
+and `test/client-conformance.test.js`. Do not satisfy them by vendoring
+those suite files. Say which tests you ran.
