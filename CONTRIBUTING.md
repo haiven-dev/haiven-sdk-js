@@ -1,7 +1,8 @@
 # Contributing
 
-This repository is public. Bug reports and questions are welcome. Code from
-outside Haiven is not accepted until a license file is in the repository.
+This repository is public. Bug reports, questions, fixes, and documentation
+improvements are welcome. Contributions are accepted under the Apache
+License, Version 2.0. See [LICENSE](LICENSE).
 
 ## Issues
 
@@ -13,15 +14,16 @@ the problem. Do not paste access tokens, passwords, or private endpoints.
 
 ## Pull requests
 
-Code from outside Haiven is not accepted until a license file is in the
-repository. Until then, use GitHub issues for bug reports and questions.
-Do not open a pull request that changes this repository.
+Unless you say otherwise, a contribution you submit is licensed under the
+Apache License, Version 2.0, as section 5 of [LICENSE](LICENSE) says. Do
+not add code you cannot license that way. For a large change, open an issue
+first.
 
-Haiven changes branch from `sdk-dev` and open their pull request against
-`sdk-dev`. `main` is the default branch, so set the base to `sdk-dev` when
-you open the pull request. Before you push, rebase onto the current
-`sdk-dev`; do not merge `sdk-dev` into your branch. Say what changed and
-how you checked it. Keep the change focused.
+Branch from `sdk-dev` and open the pull request against `sdk-dev`. `main`
+is the default branch, so set the base to `sdk-dev` when you open the pull
+request. Before you push, rebase onto the current `sdk-dev`; do not merge
+`sdk-dev` into your branch. Say what changed and how you checked it. Keep
+the change focused.
 
 Pull requests into `sdk-dev` are squash-merged. For a pull request with one
 commit, GitHub uses that commit's subject as the squash commit subject.

@@ -178,6 +178,20 @@ TypeScript. To take a newer revision:
    `test/sibling-backend.test.js` covers, and the type check in
    `test/contracts.test.d.ts`.
 
+## License
+
+Haiven's software is Apache-2.0. The source in this repository is licensed
+under the Apache License, Version 2.0. The terms are in [`LICENSE`](LICENSE),
+and `package.json` records the SPDX identifier `Apache-2.0`.
+Contributions are accepted under that license, as
+[CONTRIBUTING.md](CONTRIBUTING.md) says.
+
+Source files do not carry per-file license headers. `LICENSE` covers every
+file in the repository. `src/` and `test/` are copied and compiled from
+`sdks/js` in `haiven-sdk`, as [Updating from haiven-sdk](#updating-from-haiven-sdk)
+describes, and that source has no headers, so a header added only here would
+be lost at the next copy.
+
 ## Layout
 
 ```text
