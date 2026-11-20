@@ -1,0 +1,31 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+/**
+ * A server frame that answers one frame the client sent.
+ */
+export type WsServerReplyV0 = {
+    /**
+     * The frame discriminator, echoing the type of the frame being answered or naming an auth outcome.
+     */
+    type: string;
+    /**
+     * The identifier the client sent on the frame this answers, or the empty string when the server initiated it.
+     */
+    requestId: string;
+    /**
+     * Whether the frame this answers was accepted.
+     *
+     * Discriminates by PRESENCE, not value — a refused reply still carries it.
+     */
+    success: boolean;
+    /**
+     * The result body, present when the frame succeeded and the type carries one.
+     */
+    payload?: unknown;
+    /**
+     * A machine-readable error code from the published vocabulary, present only when success is false.
+     */
+    error?: string;
+};

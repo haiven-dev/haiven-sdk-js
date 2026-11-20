@@ -1,0 +1,45 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+export type PresenceV0Status = {
+    /**
+     * The emoji associated with the user's status.
+     */
+    emoji: string;
+    /**
+     * The text associated with the user's status.
+     */
+    text: string;
+    /**
+     * The time at which this value expires.
+     */
+    expiresAt: string;
+};
+export type PresenceV0Availability = {
+    /**
+     * The current state represented by this value.
+     */
+    state: string;
+    /**
+     * The time at which this value expires.
+     */
+    expiresAt: string;
+};
+/**
+ * A user's current availability and status.
+ */
+export type PresenceV0 = {
+    /**
+     * The user identifier.
+     */
+    userId: string;
+    /**
+     * The user's current availability state.
+     */
+    availability: PresenceV0Availability;
+    /**
+     * The user's current custom status.
+     */
+    status: PresenceV0Status;
+};

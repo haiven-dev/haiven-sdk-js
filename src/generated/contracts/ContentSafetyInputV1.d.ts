@@ -1,0 +1,29 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+/**
+ * The input a client hands to the embedded policy evaluator for one piece of content.
+ */
+export type ContentSafetyInputV1 = {
+    /**
+     * Kind of content being assessed, such as chat-message.
+     */
+    signal_type: string;
+    /**
+     * Reference to the content's subject, as type:identifier.
+     */
+    subject_ref: string;
+    /**
+     * Fused severity of the local evidence for this content.
+     */
+    fused_severity: unknown;
+    /**
+     * Confidence in the fused severity, from 0 to 1.
+     */
+    fused_confidence: number;
+    /**
+     * Fusion summary the policy bundle's rules match against, as level names and engine-name lists.
+     */
+    policy_runtime_summary: Record<string, unknown>;
+};

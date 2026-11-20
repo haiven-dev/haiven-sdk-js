@@ -1,0 +1,33 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+/**
+ * The advisory result of an embedded policy evaluation, surfaced to the client before the server has decided.
+ */
+export type LocalSafetyAssessmentV1 = {
+    /**
+     * Advisory outcome of the local evaluation; never an authoritative allow.
+     */
+    outcome: unknown;
+    /**
+     * Severity the matched policy rule assigned to this content.
+     */
+    effective_severity: unknown;
+    /**
+     * Identifier of the policy rule that produced this assessment.
+     */
+    matched_rule_id: string;
+    /**
+     * Whether the bundle's default rule produced this assessment because no specific rule matched.
+     */
+    default_rule_used: boolean;
+    /**
+     * SHA-256 digest of the policy bundle that produced this assessment, as lowercase hex.
+     */
+    bundle_sha256: string;
+    /**
+     * Version label of the policy bundle that produced this assessment.
+     */
+    policy_version: string;
+};

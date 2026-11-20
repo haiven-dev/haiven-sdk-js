@@ -1,0 +1,39 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+export type P2pIceServersReplyV0IceServersItem = {
+    /**
+     * STUN and TURN URLs of one server.
+     */
+    urls: string[];
+    /**
+     * The TURN username: absent for STUN.
+     */
+    username?: string;
+    /**
+     * The TURN password: absent for STUN.
+     */
+    credential?: string;
+};
+/**
+ * STUN and TURN servers for the caller's session participation, with when to fetch them again.
+ */
+export type P2pIceServersReplyV0 = {
+    /**
+     * Whether direct candidates are allowed: auto allows them and relay-only does not.
+     */
+    relayPolicy: string;
+    /**
+     * The time at which this value expires.
+     */
+    expiresAt: string | null;
+    /**
+     * When to fetch new credentials: null with STUN only.
+     */
+    refreshAfter: unknown;
+    /**
+     * Servers to pass to RTCPeerConnection.
+     */
+    iceServers: P2pIceServersReplyV0IceServersItem[];
+};

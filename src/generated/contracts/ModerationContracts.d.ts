@@ -1,0 +1,9 @@
+// Generated from the Haiven studio moderation HTTP API v0 OpenAPI description. Do not edit by hand.
+export type JsonObject = Record<string, unknown>;
+export type CreateRobloxModerationEventParams = JsonObject;
+export type ErrorCode = JsonObject;
+export type ErrorResponse = JsonObject;
+export type GenerateDFAPIKeyResponse = JsonObject;
+export type GetDFAAPIKeyByUserIDRow = JsonObject;
+export type ModerationOperation = "GET /moderation/df/api-keys" | "POST /moderation/df/api-keys" | "GET /moderation/df/check" | "POST /moderation/df/check" | "POST /moderation/df/events";
+export declare function decodeModerationObject(value: unknown): JsonObject;

@@ -1,0 +1,25 @@
+// Generated from the published Haiven contract schemas. Do not edit by hand.
+//
+// The nullability of a presence discriminant is deliberate and is NOT derived
+// from `required`.
+/**
+ * A request to submit a chat message.
+ */
+export type ChatSendRequestV0 = {
+    /**
+     * The chat channel identifier.
+     */
+    channelId: string;
+    /**
+     * The parent message identifier when this message is a reply.
+     */
+    parentMessageId?: string;
+    /**
+     * The sender's own id for this message (at most 128 characters). It is the deduplication key: a resend with the same id (for example after a reconnect) returns the message already sent instead of a duplicate. The same id for a different channel or parent or content is client_message_id_conflict.
+     */
+    clientMessageId?: string;
+    /**
+     * The user-authored message content.
+     */
+    content: string;
+};
