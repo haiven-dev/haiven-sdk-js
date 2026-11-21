@@ -5,6 +5,25 @@ The GitHub repository is [`haiven-sdk-js`](https://github.com/haiven-dev/haiven-
 Sources under `src/` and `test/` are JavaScript. Each module has a sibling
 `.d.ts` declaration file. Node runs the `.js` files directly.
 
+## Install
+
+Use Node.js 22.18 or later. From your project directory, install the published
+SDK `0.1.0-preview.1` source archive with npm.
+
+```sh
+npm install https://codeload.github.com/haiven-dev/haiven-sdk-js/tar.gz/4d4b7f68dffda8f064b12a1cad73eb0267d32b45
+```
+
+For a local source checkout, install the same revision from disk.
+
+```sh
+git clone https://github.com/haiven-dev/haiven-sdk-js.git
+git -C haiven-sdk-js checkout --detach 4d4b7f68dffda8f064b12a1cad73eb0267d32b45
+npm install ./haiven-sdk-js
+```
+
+Import the SDK from `@haiven/sdk-ts` and commit your npm lockfile.
+
 ## The package
 
 `package.json` points `exports` at `src/` and publishes that tree, except
